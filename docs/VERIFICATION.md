@@ -132,6 +132,7 @@ provider.
 | App closed → first call activates it | ✅ Authenticator was not running; listing the accounts started it and returned data |
 | App unavailable / call error | ✅ shows "Authenticator is not available…" + **Open Authenticator** |
 | App **not installed** (provider name and desktop file absent) | ✅ extension still loads and shows the panel icon; popup reports "Authenticator is not installed.", no open-app entry, only one log line, and it retries about every 5 s instead of every second |
+| Settings gear on real Wayland (user's live session) | ✅ opens and raises Authenticator's preferences window in the foreground, with no "is ready" notification, even though the D-Bus calls send empty `platform_data` (U04) |
 | Provider gate returns empty (locked) **with the popup already open** | ✅ automatic 1 s tick cleared the rows and showed "No codes available. Authenticator is locked or has no accounts." |
 | Real passphrase-protected instance (current re-gate code): popup open while locked | ✅ `rowCount:0`, "No codes available. Authenticator is locked or has no accounts." (`menuOpen:true`) |
 | Real instance: lock while a code is revealed (popup already open) | ✅ `revealed:true, code:"482911"` → next tick `rowCount:0`, locked status, `revealed:[]` |
