@@ -1,0 +1,40 @@
+/* OTP Panel — minimal styling */
+
+.otp-panel-scrollview {
+    max-height: 24em;
+}
+
+.otp-panel-search-item {
+    padding: 4px 6px;
+}
+
+.otp-panel-title {
+    font-weight: bold;
+}
+
+.otp-panel-subtitle {
+    font-size: 0.85em;
+    opacity: 0.7;
+}
+
+.otp-panel-code {
+    font-family: monospace;
+    letter-spacing: 0.15em;
+    margin-top: 2px;
+    opacity: 0.6;
+}
+
+.otp-panel-code-visible {
+    opacity: 1;
+    letter-spacing: 0.1em;
+}
+
+.otp-panel-status {
+    opacity: 0.75;
+    max-width: 24em;
+}
+
+.otp-panel-reveal {
+    padding: 2px;
+    border-radius: 6px;
+}

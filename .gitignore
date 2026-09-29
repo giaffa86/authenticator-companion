@@ -1,0 +1,31 @@
+# Local private/editor state
+private/
+.agents/
+.codex/
+.claude/
+.serena/
+.vscode/
+.idea/
+
+# Local Python virtualenvs
+.venv/
+venv/
+
+# Python cache (tools/*.py)
+__pycache__/
+*.py[cod]
+
+# Generated extension bundles
+*.shell-extension.zip
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*~
+*.bak
+.DS_Store
+
+# Local runtime artifacts
+core
+core.*

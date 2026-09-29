@@ -1,0 +1,10 @@
+{
+  "uuid": "otp-panel@giaffa86",
+  "name": "OTP Panel",
+  "description": "Shows the accounts already configured in GNOME Authenticator in the top panel and copies the current OTP code with one click. Authenticator stays the only source of accounts: the extension reads them through its D-Bus Search Provider and never imports, stores or reads secrets itself.",
+  "shell-version": [
+    "50"
+  ],
+  "url": "https://github.com/giaffa86/otp-panel-gnome",
+  "version": 1
+}

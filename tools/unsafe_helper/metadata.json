@@ -1,0 +1,7 @@
+{
+  "uuid": "otp-panel-test-unsafe@giaffa86",
+  "name": "OTP Panel test unsafe-mode helper",
+  "description": "Test-only helper: enables global.context.unsafe_mode so org.gnome.Shell.Eval can be used by the isolated test harness. Not shipped.",
+  "shell-version": ["50"],
+  "version": 1
+}
