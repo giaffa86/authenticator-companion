@@ -130,6 +130,10 @@ provider.
 | App unavailable / call error | ✅ shows "Authenticator is not available…" + **Open Authenticator** |
 | App **not installed** (provider name and desktop file absent) | ✅ extension still loads and shows the panel icon; popup reports "Authenticator is not installed.", no open-app entry, only one log line, and it retries about every 5 s instead of every second |
 | Provider gate returns empty (locked) **with the popup already open** | ✅ automatic 1 s tick cleared the rows and showed "No codes available. Authenticator is locked or has no accounts." |
+| Real passphrase-protected instance: popup open while locked | ✅ `rowCount:0`, "No codes available. Authenticator is locked or has no accounts." (`menuOpen:true`) |
+| Real instance: lock while a code is revealed (popup already open) | ✅ `revealed:true, code:"115254"` → next 1 s tick `rowCount:0` + locked status |
+| Real instance: fresh popup while still locked | ✅ close/reopen → `rowCount:0`, locked status |
+| Real instance: unlock restores list + live code | ✅ `rowCount:1`, `revealed:true`, `code:"115254"` after typing the passphrase |
 | Recovery after an empty/error state | ✅ list repopulates once the provider answers again |
 | Clean `disable()` | ✅ `_refreshId=0`, rows destroyed, `_button=null`, `_entry=null`, no error; re-enable returns to ACTIVE |
 | Closing the popup clears codes | ✅ rows destroyed, old row `_code=null`, `revealed=false` |
@@ -151,14 +155,11 @@ clipboard after click: 791575  (equals provider code 791575)
 > Tracked in `docs/OPEN_ITEMS.md` (OTP-001 … OTP-005), with priorities and
 > closure steps.
 
-- **A real passphrase-protected (locked) Authenticator.** No passphrase is
-  configured in this environment and the app's password page could not be driven
-  automatically (GTK4 text entries are not exposed through AT-SPI here, and
-  AT-SPI keyboard synthesis did not deliver input on Wayland). The lock path was
-  therefore verified by making the provider return an empty set, which is exactly
-  what Authenticator returns while locked, and by reading the upstream source.
-  The requirement "honour a lock that happens with the popup already open" is
-  covered by that simulation plus the source contract in §1.3.
+- ~~A real passphrase-protected (locked) Authenticator.~~ **Closed** (OTP-001):
+  verified on a real passphrase-protected instance on 2026-09-29 — see §2.2 and
+  `docs/OPEN_ITEMS.md`. The lock was triggered with the app's own `app.lock`
+  action over D-Bus and undone by typing the passphrase, exercising the 1 s
+  availability gate in both directions with the popup open.
 - **`LaunchSearch` / `ActivateResult` from the extension.** OTP Panel copies the
   code itself instead of relying on Shell's result activation, so these methods
   are not used. The "Open Authenticator" entry uses `Gio.DesktopAppInfo`; its
@@ -181,6 +182,11 @@ The test account was left in place because removing it would require writing
 directly to Authenticator's database/keyring; delete it from the Authenticator
 UI when no longer needed.
 
+For the OTP-001 closure a passphrase was set on the test instance with
+auto-lock enabled (kept in place as the user's choice), and the document portal
+(`org.freedesktop.portal.Documents`) was restarted during the session after its
+systemd user unit was found in a failed state.
+
 ## 3. How to reproduce
 
 ```sh
@@ -189,6 +195,11 @@ gjs -m tools/dbustest.js
 
 # 2. full extension verification in an isolated nested GNOME Shell 50
 ./tools/nested_env.sh /path/to/inner-test.sh
+
+# 2b. observe lock/unlock behaviour on a real passphrase-protected instance:
+#     tools/inner_locked_test.sh opens the popup, reveals a code and prints a
+#     state snapshot every second (see its header for the coordination protocol).
+./tools/nested_env.sh tools/inner_locked_test.sh
 
 # 3. same, but with the provider hidden to simulate "app not installed":
 OTP_SKIP_PROXY=1 ./tools/nested_env.sh /path/to/inner-test.sh

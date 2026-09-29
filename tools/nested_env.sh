@@ -30,7 +30,7 @@ export OTP_SKIP_PROXY="${OTP_SKIP_PROXY:-0}"
 if [ "$OTP_SKIP_PROXY" = "1" ]; then
   export XDG_DATA_DIRS="/usr/share"
 fi
-timeout 100 dbus-run-session -- bash -c '
+timeout "${OTP_TIMEOUT:-100}" dbus-run-session -- bash -c '
   set -u
   if [ "$OTP_SKIP_PROXY" != "1" ]; then
     gjs -m "$OTP_SRC/tools/provider_proxy.js" >"$OTP_RUNTIME/proxy.log" 2>&1 &
