@@ -10,7 +10,7 @@ lost. `docs/VERIFICATION.md` §2.3 is the evidence source.
 | OTP-002 | `LaunchSearch` / `ActivateResult` not used by the extension | Low | Accepted |
 | OTP-003 | Non-Flatpak packaging not tested | Low | Open |
 | OTP-004 | Large account lists / multiple providers not stress-tested | Low | **Closed** |
-| OTP-005 | Installed copy in the live login session not exercised (needs next login) | Medium | Open — recorded, needs user logout/login |
+| OTP-005 | Installed copy in the live login session not exercised (needs next login) | Medium | **Closed** |
 | OTP-006 | Lock is not enforced inside the provider's `GetResultMetas`, leaving a narrow client-side race | High | **Open — needs provider fix or explicit acceptance** |
 
 ---
@@ -103,16 +103,27 @@ accounts by provider. The 200-row run covers the scrolling/filtering path.
 
 ## OTP-005 — Installed copy in the live login session not exercised
 
-**Status:** recorded residual, requires the user's next logout/login. GNOME Shell
-50 enumerates extensions only at startup, so the copy installed in
-`~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86` is picked up after the
-next login. This is standard Shell behavior, not an extension code path: the
-nested-shell runs load the exact same three files through the same
-`ExtensionManager` enable/disable path, so the remaining risk is discovery, not
-behaviour.
+**Status:** closed on 2026-09-29 on the user's live session. GNOME Shell 50
+enumerates extensions only at startup, so the copy installed in
+`~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86` is
+picked up after the next login. This is standard Shell behavior, not an
+extension code path.
 
-**Closure:** log out and back in once, confirm the panel button appears and the
-menu works. This is the only item that cannot be closed without the user.
+**Evidence (live session, after logout/login).**
+
+- After login the extension was listed and `gnome-extensions info` reported
+  `Enabled: Yes`, `State: ACTIVE`; the panel button was present.
+- `./scripts/sync-extension.sh` then installed the final three files (hashes
+  equal to the working tree) and reloaded the extension: it returned to
+  `ACTIVE` with no `[authenticator-companion]` or JS error in the journal after
+  the reload.
+- The live provider gate (`GetInitialResultSet([''])` on the real
+  `com.belmoussaoui.Authenticator.SearchProvider`) returned 10 account ids, and
+  the user confirmed the popup lists all 10 accounts with Authenticator
+  unlocked.
+
+Reveal/copy behaviour on the same bytes is covered by the nested-shell race
+test (`docs/VERIFICATION.md` §4).
 
 ---
 

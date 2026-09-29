@@ -195,11 +195,10 @@ unprotected instance cannot be locked over D-Bus.
   (200 accounts, filter, reveal, close) in the nested Shell 50.5; see
   `docs/OPEN_ITEMS.md` OTP-004. Multiple providers are not a distinct path:
   `description` is only a string in the metadata.
-- **The final installed instance in the current login session.** Because GNOME
-  Shell 50 only scans extensions at startup, the extension installed in
-  `~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86` is discovered only
-  after the next login; the runtime tests above used a *fresh* nested shell that
-  loaded the same code.
+- ~~The final installed instance in the current login session.~~ **Closed**
+  (OTP-005): after logout/login the installed copy was `ACTIVE`, the sync script
+  installed the final three files and reloaded it without errors, and the popup
+  listed all 10 real accounts — see `docs/OPEN_ITEMS.md`.
 
 ### 2.4 Environment side effects
 
