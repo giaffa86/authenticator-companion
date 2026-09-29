@@ -38,7 +38,7 @@ Local checklist for keeping this extension maintainable and acceptable for GNOME
 
 ## Packaging
 
-- The extension UUID in `metadata.json` must match the installed directory name (`otp-panel@giaffa86`).
+- The extension UUID in `metadata.json` must match the installed directory name (`authenticator-companion@giaffa86`).
 - Only `metadata.json`, `extension.js` and `stylesheet.css` are shipped; keep `tools/`, `docs/`, `scripts/`, `*.md` and generated bundles out of release/source packages via `.gitignore` and the sync script.
 - There is no GSettings schema, so nothing to compile.
 - Verify with a nested GNOME Shell after significant `extension.js` changes (see `docs/VERIFICATION.md`).

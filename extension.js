@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// OTP Panel — GNOME Shell 50 extension.
+// Authenticator Companion — GNOME Shell 50 extension.
 //
 // Shows the accounts configured in GNOME Authenticator (com.belmoussaoui.Authenticator)
 // in the top panel and copies the current one-time password with a click.
@@ -38,6 +38,11 @@ const BUS_NAME = `${APP_ID}.SearchProvider`;
 const OBJECT_PATH = '/com/belmoussaoui/Authenticator/SearchProvider';
 const IFACE = 'org.gnome.Shell.SearchProvider2';
 
+// GApplication object on the app's own bus name. Used to open Authenticator's
+// preferences window from the popup (with a launch fallback when unavailable).
+const APP_OBJECT_PATH = '/com/belmoussaoui/Authenticator';
+const PREFERENCES_ACTION = 'preferences';
+
 // How often the open popup re-checks availability and refreshes revealed codes.
 // This keeps the displayed code in sync with its expiry without any long-lived
 // caching. The timer only runs while the menu is open.
@@ -48,6 +53,10 @@ const REFRESH_INTERVAL_MS = 1000;
 const DEFAULT_PERIOD_SECONDS = 30;
 const MIN_PERIOD_SECONDS = 5;
 const MAX_PERIOD_SECONDS = 300;
+// The countdown bar switches to the warning color for the final stretch.
+const TIMER_LOW_FRACTION = 0.2;
+// Fixed width of the countdown bar (also set in stylesheet.css).
+const TIMER_WIDTH_PX = 160;
 
 const MASK = '\u2022\u2022\u2022\u2022\u2022\u2022';
 
@@ -141,7 +150,7 @@ class AuthenticatorSearchProvider {
 const AccountMenuItem = GObject.registerClass(
 class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
     _init(meta, {onReveal, onCopy}) {
-        super._init({style_class: 'otp-panel-item'});
+        super._init({style_class: 'authenticator-companion-item'});
 
         this.accountId = meta.id;
         this.accountName = meta.name;
@@ -164,25 +173,37 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
         });
         this._title = new St.Label({
             text: meta.name,
-            style_class: 'otp-panel-title',
+            style_class: 'authenticator-companion-title',
         });
         this._title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         this._subtitle = new St.Label({
             text: meta.description,
-            style_class: 'otp-panel-subtitle',
+            style_class: 'authenticator-companion-subtitle',
         });
         this._subtitle.clutter_text.ellipsize = 1;
         this._codeLabel = new St.Label({
             text: MASK,
-            style_class: 'otp-panel-code',
+            style_class: 'authenticator-companion-code',
         });
+
+        // Countdown bar shown under a revealed code. It has a fixed width
+        // (see stylesheet.css) and collapses to zero height while masked.
+        this._timer = new St.BoxLayout({
+            style_class: 'authenticator-companion-timer',
+        });
+        this._timerFill = new St.Widget({
+            style_class: 'authenticator-companion-timer-fill',
+        });
+        this._timer.add_child(this._timerFill);
+
         box.add_child(this._title);
         box.add_child(this._subtitle);
         box.add_child(this._codeLabel);
+        box.add_child(this._timer);
         this.add_child(box);
 
         this._revealButton = new St.Button({
-            style_class: 'otp-panel-reveal button',
+            style_class: 'authenticator-companion-reveal button',
             can_focus: true,
             accessible_name: _('Show code'),
         });
@@ -240,7 +261,8 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
         this._expiryMs = 0;
         this._revealIcon.icon_name = 'view-reveal-symbolic';
         this._codeLabel.text = MASK;
-        this._codeLabel.remove_style_class_name('otp-panel-code-visible');
+        this._codeLabel.remove_style_class_name('authenticator-companion-code-visible');
+        this._updateTimer();
     }
 
     _periodEndMs(nowMs) {
@@ -261,15 +283,39 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
     _renderCode() {
         if (this._copied) {
             this._codeLabel.text = _('Copied to clipboard');
-            this._codeLabel.add_style_class_name('otp-panel-code-visible');
-            return;
-        }
-        if (this._revealed && this._code !== null) {
+            this._codeLabel.add_style_class_name('authenticator-companion-code-visible');
+        } else if (this._revealed && this._code !== null) {
             this._codeLabel.text = `${this._code}  \u00b7  ${this.remainingSeconds()}s`;
-            this._codeLabel.add_style_class_name('otp-panel-code-visible');
+            this._codeLabel.add_style_class_name('authenticator-companion-code-visible');
         } else {
             this._codeLabel.text = MASK;
-            this._codeLabel.remove_style_class_name('otp-panel-code-visible');
+            this._codeLabel.remove_style_class_name('authenticator-companion-code-visible');
+        }
+        this._updateTimer();
+    }
+
+    /** Keep the graphical countdown in sync with the remaining seconds. */
+    _updateTimer() {
+        const active = this._revealed && this._code !== null && !this._copied;
+
+        if (active) {
+            this._timer.add_style_class_name('authenticator-companion-timer-active');
+            this._timerFill.add_style_class_name('authenticator-companion-timer-fill-active');
+
+            const fraction = this._period > 0
+                ? Math.min(1, Math.max(0, this.remainingSeconds() / this._period))
+                : 0;
+            this._timerFill.set_width(Math.round(TIMER_WIDTH_PX * fraction));
+
+            if (fraction <= TIMER_LOW_FRACTION)
+                this._timerFill.add_style_class_name('authenticator-companion-timer-fill-low');
+            else
+                this._timerFill.remove_style_class_name('authenticator-companion-timer-fill-low');
+        } else {
+            this._timer.remove_style_class_name('authenticator-companion-timer-active');
+            this._timerFill.remove_style_class_name('authenticator-companion-timer-fill-active');
+            this._timerFill.remove_style_class_name('authenticator-companion-timer-fill-low');
+            this._timerFill.set_width(0);
         }
     }
 
@@ -305,7 +351,7 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
     }
 });
 
-export default class OtpPanelExtension extends Extension {
+export default class AuthenticatorCompanionExtension extends Extension {
     enable() {
         this._service = new AuthenticatorSearchProvider();
         this._rows = [];
@@ -315,7 +361,7 @@ export default class OtpPanelExtension extends Extension {
         this._lastErrorText = null;
         this._tickCounter = 0;
 
-        this._button = new PanelMenu.Button(0.5, _('OTP Panel'), false);
+        this._button = new PanelMenu.Button(0.5, _('Authenticator Companion'), false);
         this._button.add_child(new St.Icon({
             icon_name: 'dialog-password-symbolic',
             style_class: 'system-status-icon',
@@ -327,7 +373,7 @@ export default class OtpPanelExtension extends Extension {
         const searchItem = new PopupMenu.PopupBaseMenuItem({
             reactive: false,
             can_focus: false,
-            style_class: 'otp-panel-search-item',
+            style_class: 'authenticator-companion-search-item',
         });
         this._entry = new St.Entry({
             hint_text: _('Search accounts\u2026'),
@@ -339,6 +385,22 @@ export default class OtpPanelExtension extends Extension {
             style_class: 'popup-menu-icon',
         }));
         searchItem.add_child(this._entry);
+
+        // Shortcut next to the search field: opens Authenticator's settings.
+        // Only meaningful (and visible) while the app is unlocked.
+        this._settingsButton = new St.Button({
+            style_class: 'authenticator-companion-settings button',
+            can_focus: true,
+            accessible_name: _('Authenticator settings'),
+        });
+        this._settingsButton.set_child(new St.Icon({
+            icon_name: 'preferences-system-symbolic',
+            style_class: 'popup-menu-icon',
+        }));
+        this._settingsButton.connect('clicked', () => this._openSettings());
+        this._settingsButton.visible = false;
+        searchItem.add_child(this._settingsButton);
+
         menu.addMenuItem(searchItem);
 
         this._entryTextChangedId =
@@ -346,14 +408,14 @@ export default class OtpPanelExtension extends Extension {
 
         // Status placeholder (loading / locked / unavailable).
         this._statusItem = new PopupMenu.PopupMenuItem('', {reactive: false});
-        this._statusItem.label.add_style_class_name('otp-panel-status');
+        this._statusItem.label.add_style_class_name('authenticator-companion-status');
         menu.addMenuItem(this._statusItem);
 
         // Scrollable account list. PopupMenuSection has no scroll view of its
         // own, so the section actor is wrapped once and inserted into the menu.
         this._section = new PopupMenu.PopupMenuSection();
         this._scrollView = new St.ScrollView({
-            style_class: 'otp-panel-scrollview',
+            style_class: 'authenticator-companion-scrollview',
             hscrollbar_policy: St.PolicyType.NEVER,
             vscrollbar_policy: St.PolicyType.AUTOMATIC,
             x_expand: true,
@@ -393,6 +455,11 @@ export default class OtpPanelExtension extends Extension {
         if (this._entry) {
             this._entry.destroy();
             this._entry = null;
+        }
+
+        if (this._settingsButton) {
+            this._settingsButton.destroy();
+            this._settingsButton = null;
         }
 
         if (this._section) {
@@ -509,6 +576,16 @@ export default class OtpPanelExtension extends Extension {
             }
             this._lastErrorText = null;
 
+            // The account set changed while the popup was open (lock/unlock,
+            // account added or removed): rebuild so the list and the settings
+            // shortcut stay in sync with the current availability.
+            if (!this._sameIds(ids)) {
+                const metas = await this._service.getResultMetas(ids);
+                this._rebuildRows(metas);
+                this._lastIds = ids;
+            }
+            this._setStatus(null, {open: false});
+
             for (const row of this._rows)
                 row.tick();
 
@@ -617,6 +694,59 @@ export default class OtpPanelExtension extends Extension {
         app.launch([], null);
     }
 
+    _openSettings() {
+        // Authenticator's `preferences` action assumes the main window already
+        // exists: its handler calls app.active_window(), which unwraps a None
+        // and panics (SIGABRT) when the app was started as a D-Bus service by
+        // the search provider (no window yet). Activate the app first so the
+        // window is created, then activate the preferences action; if the app
+        // is not reachable at all, fall back to just launching it.
+        const activateParams = new GLib.Variant('(a{sv})', [{}]);
+
+        Gio.DBus.session.call(
+            APP_ID,
+            APP_OBJECT_PATH,
+            'org.freedesktop.Application',
+            'Activate',
+            activateParams,
+            null,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            null,
+            (connection, res) => {
+                try {
+                    connection.call_finish(res);
+                } catch (e) {
+                    this._openAuthenticator();
+                    return;
+                }
+                this._activatePreferences();
+            });
+    }
+
+    _activatePreferences() {
+        const params = new GLib.Variant('(sava{sv})', [PREFERENCES_ACTION, [], {}]);
+
+        Gio.DBus.session.call(
+            APP_ID,
+            APP_OBJECT_PATH,
+            'org.freedesktop.Application',
+            'ActivateAction',
+            params,
+            null,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            null,
+            (connection, res) => {
+                try {
+                    connection.call_finish(res);
+                    this._button?.menu.close();
+                } catch (e) {
+                    this._openAuthenticator();
+                }
+            });
+    }
+
     // --- status -------------------------------------------------------------
 
     _setStatus(text, {open}) {
@@ -624,6 +754,9 @@ export default class OtpPanelExtension extends Extension {
         if (text !== null)
             this._statusItem.label.text = text;
         this._openItem.visible = !!open;
+        // The settings shortcut is only relevant when accounts are available,
+        // which is exactly the state in which no status message is shown.
+        this._settingsButton.visible = text === null;
     }
 
     _reportError(error) {
@@ -642,7 +775,7 @@ export default class OtpPanelExtension extends Extension {
 
         // Log once per state change, never once per retry.
         if (text !== this._lastErrorText) {
-            console.error(`[otp-panel] ${error}`);
+            console.error(`[authenticator-companion] ${error}`);
             this._lastErrorText = text;
         }
         this._setStatus(text, {open: installed});

@@ -16,7 +16,7 @@
 #
 # Usage: OTP001_OBSERVE_SECONDS=180 bash tools/inner_locked_test.sh
 set -u
-UUID=otp-panel@giaffa86
+UUID=authenticator-companion@giaffa86
 OBSERVE="${OTP001_OBSERVE_SECONDS:-180}"
 SIGDIR="${OTP001_SIGDIR:-/tmp/otp-signals}"
 mkdir -p "$SIGDIR"

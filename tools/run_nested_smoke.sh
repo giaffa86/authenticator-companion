@@ -2,8 +2,8 @@
 # Smoke test: start an isolated nested (headless) GNOME Shell 50 on a private
 # bus + isolated runtime dir, and check whether it loads the extension.
 set -u
-EXT_UUID="otp-panel@giaffa86"
-SRC="/home/giaffa86/workspace_personal/otp-panel-gnome"
+EXT_UUID="authenticator-companion@giaffa86"
+SRC="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 HOST_ADDR="$DBUS_SESSION_BUS_ADDRESS"
 
 RUNTIME=$(mktemp -d /tmp/otp-rt-XXXXXX); chmod 700 "$RUNTIME"

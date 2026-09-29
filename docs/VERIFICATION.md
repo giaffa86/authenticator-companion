@@ -9,6 +9,9 @@ remains unverified.
 - Test account: a throwaway TOTP account added through Authenticator's own
   `otpauth://` import path
   (`OTP Panel Test` / `test@example.com`, public test secret `JBSWY3DPEHPK3PXP`).
+  The quoted strings below are verbatim output from runs made while the extension
+  was still called *OTP Panel*; the label `OTP Panel Test` is the test account's
+  own name, not the extension's.
 
 ## 1. Authenticator Search Provider — analysis
 
@@ -71,14 +74,14 @@ and `src/models/search_provider.rs`:
 **Security consequence:** because `GetResultMetas` ignores the lock state, an
 extension must treat `GetInitialResultSet` as the authoritative availability
 gate and re-check it while its popup is open, otherwise it would keep showing
-codes for a locked app. OTP Panel does exactly that.
+codes for a locked app. Authenticator Companion does exactly that.
 
 ### 1.4 The devkit crash constraint
 
 Per
 [`notifications-copier/DEVKIT_CRASH_ANALYSIS.md`](https://github.com/giaffa86/notifications-copier/blob/main/DEVKIT_CRASH_ANALYSIS.md),
 `Gio.DBus.session.add_filter()` deterministically crashes `gnome-shell --devkit`
-in GNOME Shell 50. OTP Panel therefore uses **no global D-Bus filter** and does
+in GNOME Shell 50. Authenticator Companion therefore uses **no global D-Bus filter** and does
 no notification interception; it makes a single targeted async call to the
 provider. The nested-shell test below confirms this approach does not crash the
 shell.
@@ -160,7 +163,7 @@ clipboard after click: 791575  (equals provider code 791575)
   `docs/OPEN_ITEMS.md`. The lock was triggered with the app's own `app.lock`
   action over D-Bus and undone by typing the passphrase, exercising the 1 s
   availability gate in both directions with the popup open.
-- **`LaunchSearch` / `ActivateResult` from the extension.** OTP Panel copies the
+- **`LaunchSearch` / `ActivateResult` from the extension.** Authenticator Companion copies the
   code itself instead of relying on Shell's result activation, so these methods
   are not used. The "Open Authenticator" entry uses `Gio.DesktopAppInfo`; its
   launch was not exercised end-to-end in the headless session.
@@ -168,13 +171,14 @@ clipboard after click: 791575  (equals provider code 791575)
 - **Very large account lists / many providers.** Tested with one account.
 - **The final installed instance in the current login session.** Because GNOME
   Shell 50 only scans extensions at startup, the extension installed in
-  `~/.local/share/gnome-shell/extensions/otp-panel@giaffa86` is discovered only
+  `~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86` is discovered only
   after the next login; the runtime tests above used a *fresh* nested shell that
   loaded the same code.
 
 ### 2.4 Environment side effects
 
-For the tests, one throwaway account ("OTP Panel Test" / `test@example.com`) was
+For the tests, one throwaway account ("OTP Panel Test" / `test@example.com`; the
+label predates the rename to Authenticator Companion) was
 added to Authenticator through its own `otpauth://` import, and the GNOME Shell
 "toolkit accessibility" setting and a third-party extension were temporarily
 touched; the settings and the third-party extension were restored afterwards.
@@ -206,4 +210,4 @@ OTP_SKIP_PROXY=1 ./tools/nested_env.sh /path/to/inner-test.sh
 ```
 
 `tools/` also contains `provider_proxy.js` and the test-only `unsafe_helper`
-extension; they are not shipped with OTP Panel.
+extension; they are not shipped with Authenticator Companion.

@@ -5,14 +5,14 @@
 # Why this exists: `dbus-run-session -- gnome-shell --devkit` runs on a private
 # D-Bus session bus that has no org.freedesktop.secrets service. Authenticator
 # therefore cannot unlock its keyring on that bus and GetInitialResultSet never
-# returns, leaving the OTP Panel popup stuck on "Loading…". tools/provider_proxy.js
+# returns, leaving the Authenticator Companion popup stuck on "Loading…". tools/provider_proxy.js
 # forwards the provider calls to the already-running host Authenticator instead.
 #
 # Usage: ./tools/devkit-env.sh
 set -euo pipefail
 
 SRC="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-EXT_UUID="otp-panel@giaffa86"
+EXT_UUID="authenticator-companion@giaffa86"
 HOST_ADDR="${DBUS_SESSION_BUS_ADDRESS:-}"
 
 if [[ -z "$HOST_ADDR" ]]; then

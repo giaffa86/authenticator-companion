@@ -2,7 +2,7 @@
 
 ## Project type
 
-GNOME Shell Extension (JavaScript, no build system). UUID: `otp-panel@giaffa86`. Targets GNOME Shell 50.
+GNOME Shell Extension (JavaScript, no build system). Name: **Authenticator Companion** (renamed from *OTP Panel*), UUID: `authenticator-companion@giaffa86`. Targets GNOME Shell 50.
 
 There is no build step, package manager, test runner, linting, or CI. The `.js` files are loaded directly by GNOME Shell at runtime.
 
@@ -12,7 +12,7 @@ There is no build step, package manager, test runner, linting, or CI. The `.js` 
 ./scripts/sync-extension.sh
 ```
 
-This copies `metadata.json`, `extension.js` and `stylesheet.css` to `~/.local/share/gnome-shell/extensions/otp-panel@giaffa86/`. There is no GSettings schema to compile.
+This copies `metadata.json`, `extension.js` and `stylesheet.css` to `~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86/`. There is no GSettings schema to compile.
 
 GNOME Shell 50 only enumerates extensions at startup, so the **first** install requires a logout/login (or shell restart) before the extension appears. After that, the sync script disables/enables (or reloads) it.
 
@@ -54,6 +54,8 @@ Consequences to keep in mind:
 
 The lock state matters: `GetInitialResultSet` returns `[]` while the app is locked, but `GetResultMetas` does **not** check the lock state. Always treat `GetInitialResultSet` as the authoritative gate and only call `GetResultMetas` with ids it returned. See `docs/VERIFICATION.md` §1.3.
 
+In addition to the Search Provider, the popup's gear button opens Authenticator's settings. It first activates the app over D-Bus (`org.freedesktop.Application.Activate` on the `com.belmoussaoui.Authenticator` bus name, object path `/com/belmoussaoui/Authenticator`) so the main window exists, then activates the `preferences` GApplication action (`org.freedesktop.Application.ActivateAction`), falling back to launching the app. The intermediate `Activate` is required: the `preferences` action handler calls `app.active_window()`, which panics (SIGABRT) when the app was started as a D-Bus service by the search provider and has no window yet. This does not read or write any account data.
+
 ## GNOME Shell safety
 
 - Do not use `Gio.DBus.session.add_filter()` in `extension.js`; it crashes GNOME Shell 50 devkit sessions (see `docs/VERIFICATION.md` §1.4).
@@ -69,8 +71,8 @@ The extension ships exactly three files: `metadata.json`, `extension.js`, `style
 Create the zip for a local packed bundle:
 
 ```bash
-mkdir -p /tmp/otp-panel-pack
-zip -r -FS /tmp/otp-panel-pack/otp-panel@giaffa86.shell-extension.zip \
+mkdir -p /tmp/authenticator-companion-pack
+zip -r -FS /tmp/authenticator-companion-pack/authenticator-companion@giaffa86.shell-extension.zip \
   metadata.json \
   extension.js \
   stylesheet.css
@@ -83,7 +85,7 @@ Validate with Shexli before shipping (see `notifications-copier` AGENTS.md for t
 ```bash
 python3 -m venv /tmp/shexli-venv
 /tmp/shexli-venv/bin/pip install -U shexli 'tree-sitter==0.25.1'
-/tmp/shexli-venv/bin/shexli /tmp/otp-panel-pack/otp-panel@giaffa86.shell-extension.zip
+/tmp/shexli-venv/bin/shexli /tmp/authenticator-companion-pack/authenticator-companion@giaffa86.shell-extension.zip
 ```
 
 Pin `tree-sitter==0.25.1`: the default `tree-sitter 0.26.0` segfaults with `tree-sitter-javascript 0.25.0` when parsing `extension.js`.
@@ -98,7 +100,7 @@ Expected current Shexli result:
 | File | Role |
 |------|------|
 | `metadata.json` | Extension manifest (UUID, shell version `["50"]`, no settings-schema) |
-| `extension.js` | Entrypoint — `OtpPanelExtension` class with `enable()`/`disable()` |
+| `extension.js` | Entrypoint — `AuthenticatorCompanionExtension` class with `enable()`/`disable()` |
 | `stylesheet.css` | Panel popup styling |
 | `scripts/sync-extension.sh` | Dev install and reload script |
 | `scripts/test-provider.sh` | Host-bus provider check via `tools/dbustest.js` |

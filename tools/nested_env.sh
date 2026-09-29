@@ -4,23 +4,23 @@
 # given command inside that session.
 # Usage: nested_env.sh <script-to-run-inside>
 set -u
-SRC=/home/giaffa86/workspace_personal/otp-panel-gnome
-EXT_UUID=otp-panel@giaffa86
+SRC="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+EXT_UUID=authenticator-companion@giaffa86
 HOST_ADDR="$DBUS_SESSION_BUS_ADDRESS"
 INNER="$1"
 
 RUNTIME=$(mktemp -d /tmp/otp-rt-XXXXXX); chmod 700 "$RUNTIME"
 DATA=$(mktemp -d /tmp/otp-data-XXXXXX)
 CFG=$(mktemp -d /tmp/otp-cfg-XXXXXX)
-mkdir -p "$DATA/gnome-shell/extensions/$EXT_UUID" "$DATA/gnome-shell/extensions/otp-panel-test-unsafe@giaffa86"
+mkdir -p "$DATA/gnome-shell/extensions/$EXT_UUID" "$DATA/gnome-shell/extensions/authenticator-companion-test-unsafe@giaffa86"
 cp "$SRC/metadata.json" "$SRC/extension.js" "$SRC/stylesheet.css" \
    "$DATA/gnome-shell/extensions/$EXT_UUID/"
 cp "$SRC/tools/unsafe_helper/metadata.json" "$SRC/tools/unsafe_helper/extension.js" \
-   "$DATA/gnome-shell/extensions/otp-panel-test-unsafe@giaffa86/"
+   "$DATA/gnome-shell/extensions/authenticator-companion-test-unsafe@giaffa86/"
 
 export XDG_RUNTIME_DIR="$RUNTIME" XDG_DATA_HOME="$DATA" XDG_CONFIG_HOME="$CFG"
 export GSETTINGS_BACKEND=keyfile
-gsettings set org.gnome.shell enabled-extensions "['$EXT_UUID', 'otp-panel-test-unsafe@giaffa86']" >/dev/null 2>&1 || true
+gsettings set org.gnome.shell enabled-extensions "['$EXT_UUID', 'authenticator-companion-test-unsafe@giaffa86']" >/dev/null 2>&1 || true
 
 export HOST_DBUS_ADDRESS="$HOST_ADDR" INNER
 export OTP_SRC="$SRC" OTP_RUNTIME="$RUNTIME"
@@ -52,7 +52,7 @@ timeout "${OTP_TIMEOUT:-100}" dbus-run-session -- bash -c '
     sleep 1
   done
   for i in $(seq 1 30); do
-    r=$(gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "!!(Main.extensionManager.lookup('otp-panel@giaffa86')?.stateObj)" 2>/dev/null)
+    r=$(gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "!!(Main.extensionManager.lookup('authenticator-companion@giaffa86')?.stateObj)" 2>/dev/null)
     case "$r" in *true*) break;; esac
     sleep 1
   done

@@ -1,40 +1,74 @@
-/* OTP Panel — minimal styling */
+/* Authenticator Companion — minimal styling */
 
-.otp-panel-scrollview {
+.authenticator-companion-scrollview {
     max-height: 24em;
 }
 
-.otp-panel-search-item {
+.authenticator-companion-search-item {
     padding: 4px 6px;
 }
 
-.otp-panel-title {
+.authenticator-companion-title {
     font-weight: bold;
 }
 
-.otp-panel-subtitle {
+.authenticator-companion-subtitle {
     font-size: 0.85em;
     opacity: 0.7;
 }
 
-.otp-panel-code {
+.authenticator-companion-code {
     font-family: monospace;
     letter-spacing: 0.15em;
     margin-top: 2px;
     opacity: 0.6;
 }
 
-.otp-panel-code-visible {
+.authenticator-companion-code-visible {
     opacity: 1;
     letter-spacing: 0.1em;
 }
 
-.otp-panel-status {
+.authenticator-companion-status {
     opacity: 0.75;
     max-width: 24em;
 }
 
-.otp-panel-reveal {
+.authenticator-companion-reveal {
     padding: 2px;
     border-radius: 6px;
+}
+
+.authenticator-companion-settings {
+    padding: 2px 4px;
+    border-radius: 6px;
+    margin-left: 4px;
+}
+
+/* Graphical TOTP countdown. The track stays in the layout but collapses to
+   zero height until a code is revealed, so masked rows are unaffected. */
+.authenticator-companion-timer {
+    width: 160px;
+    margin: 0;
+}
+
+.authenticator-companion-timer-active {
+    margin-top: 6px;
+    height: 4px;
+    border-radius: 2px;
+    background-color: rgba(128, 128, 128, 0.3);
+}
+
+.authenticator-companion-timer-fill {
+    height: 0px;
+    border-radius: 2px;
+    background-color: #3584e4;
+}
+
+.authenticator-companion-timer-fill-active {
+    height: 4px;
+}
+
+.authenticator-companion-timer-fill-low {
+    background-color: #e01b24;
 }

@@ -46,7 +46,7 @@ unlocked by typing the passphrase.
 - Source contract: `InitialResultSet` returns `[]` while `is_locked()`, and
   `ResultMetas` does **not** check the lock state (upstream
   `src/application.rs`, documented in `docs/VERIFICATION.md` §1.3).
-- Runtime: OTP Panel re-checks the availability gate every 1 s while the popup is
+- Runtime: Authenticator Companion re-checks the availability gate every 1 s while the popup is
   open. Forcing the provider to return the same empty set it returns while locked
   cleared the rows and showed "No codes available. Authenticator is locked or has
   no accounts." with the popup already open — even with a code revealed.
@@ -55,7 +55,7 @@ unlocked by typing the passphrase.
 
 1. In Authenticator, set a passphrase (Preferences → *Create Password*).
 2. Lock the app (`Ctrl+L`, the lock action, or let auto-lock fire).
-3. With OTP Panel's popup open and a code revealed, trigger the lock; confirm the
+3. With Authenticator Companion's popup open and a code revealed, trigger the lock; confirm the
    rows are cleared and the locked status appears within ~1 s.
 4. Re-open the popup while still locked and confirm no codes are listed.
 5. Unlock Authenticator and confirm the list and codes come back.
@@ -72,7 +72,7 @@ a direct `GetResultMetas` call for cached ids.
 
 ## OTP-002 — `LaunchSearch` / `ActivateResult` not used
 
-OTP Panel copies codes itself and offers an "Open Authenticator" entry, so these
+Authenticator Companion copies codes itself and offers an "Open Authenticator" entry, so these
 two Search Provider methods are unused. Accepted by design; no action.
 
 ## OTP-003 — Non-Flatpak packaging not tested
@@ -88,7 +88,7 @@ refresh with many accounts and providers.
 ## OTP-005 — Installed copy in the live login session not exercised
 
 GNOME Shell 50 enumerates extensions only at startup, so the copy installed in
-`~/.local/share/gnome-shell/extensions/otp-panel@giaffa86` is picked up after the
+`~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86` is picked up after the
 next login. The runtime tests used a fresh nested Shell 50.3 that loaded the same
 code. Close by logging out/in once and confirming the panel button appears and
 the menu works.
