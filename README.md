@@ -102,8 +102,8 @@ back to launching the app when either call is unavailable.
 ## Installation
 
 ```sh
-# from this repository
-cp -r . ~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86
+# from this repository (installs exactly the three shipped files)
+./scripts/sync-extension.sh
 # or, for a packed bundle:
 gnome-extensions install authenticator-companion@giaffa86.shell-extension.zip
 ```
@@ -135,8 +135,8 @@ rm -rf ~/.local/share/gnome-shell/extensions/otp-panel@giaffa86
 
 - Click the key icon in the top panel.
 - The popup lists every account; codes are masked (`••••••`) until requested.
-- Use the eye button to reveal the current code; a countdown bar under the code
-  empties and turns red as the code approaches expiry.
+- Use the eye button to reveal the current code; it is re-fetched every second
+  while it is shown, so it stays current across a code rollover.
 - Click an account row to copy the current code to the clipboard.
 - Type in the search field to filter by account or service name.
 - The gear icon next to the search field opens Authenticator's settings (it is
@@ -147,7 +147,6 @@ rm -rf ~/.local/share/gnome-shell/extensions/otp-panel@giaffa86
 - If Authenticator is **not installed at all**, the extension still loads and the
   panel icon appears, but the popup reports that it is not installed and shows no
   open-app entry. It stays inert until the app is available.
-- The revealed code refreshes automatically when its TOTP period expires.
 
 ## Security and privacy model
 
@@ -157,13 +156,25 @@ rm -rf ~/.local/share/gnome-shell/extensions/otp-panel@giaffa86
 - **No persistence.** Codes are never written to GSettings, files, logs,
   notifications or a database. `metadata.json` declares no settings schema.
 - **Minimal in-memory lifetime.** Codes are kept in memory only while the popup
-  is open and only for rows that are revealed. Closing the popup clears them,
-  and a copied code is dropped immediately after it reaches the clipboard.
+  is open and only for rows that are revealed. Closing the popup, locking the
+  app, or rebuilding the account list clears them, and a copied code is dropped
+  from the extension's memory immediately after it reaches the clipboard. The
+  extension does **not** clear the system clipboard: the copied code stays in
+  the `CLIPBOARD` selection until it is overwritten, survives an Authenticator
+  lock, and is readable by clipboard-history tools. Clearing the clipboard
+  itself is left to the user and the desktop.
 - **Reduced exposure.** Only the account identifiers returned by the current
   availability check are ever passed to `GetResultMetas`. Because that method
   does not itself check the lock state, the extension re-checks availability
-  (`GetInitialResultSet`) every second while the popup is open, so a lock that
-  happens with the popup already open still clears the list and the codes.
+  (`GetInitialResultSet`) before and after every reveal and copy, and every
+  second while the popup is open, so a lock that happens before the code is
+  shown or copied drops the code instead of displaying it.
+- **Residual provider-side race.** A lock that lands between the extension's
+  final availability check and the clipboard/display update can still let one
+  code through, because Authenticator's `GetResultMetas` ignores the lock.
+  Closing that window completely requires the provider to enforce the lock
+  inside `GetResultMetas`; the extension alone cannot. This limit is tracked in
+  `docs/OPEN_ITEMS.md` (OTP-006).
 - **Clipboard only on request.** A code is fetched fresh and copied only when
   the user clicks a row.
 - **No D-Bus filter / no notification hooking.** The call is a targeted,
@@ -186,9 +197,16 @@ rm -rf ~/.local/share/gnome-shell/extensions/otp-panel@giaffa86
   unlocked Authenticator session it depends on: locked means no accounts and no
   codes, and the app has to be opened, unlocked and kept open (see
   [passphrase note](#authenticator-passphrase-and-extension-performance)).
+- Because Authenticator's `GetResultMetas` does not check the lock state, a very
+  narrow race remains: if the app locks between the extension's final
+  availability check and the clipboard/display update, that one response is not
+  revoked. The extension re-checks as late as it can; closing the window fully
+  needs a provider-side lock check (see `docs/OPEN_ITEMS.md` OTP-006).
 - A passphrase-protected (locked) Authenticator instance was exercised end-to-end
   in a nested shell; see `docs/VERIFICATION.md` §2.2 for exactly what was and was
   not verified, and `docs/OPEN_ITEMS.md` for the tracked item (OTP-001, closed).
+- A copied code remains in the system clipboard until it is overwritten; the
+  extension cannot and does not clear it (see the security model above).
 
 ## Development / testing
 

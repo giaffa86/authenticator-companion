@@ -1,5 +1,7 @@
 # Local private/editor state
 private/
+HOSTILE_REVIEW*.md
+REVIEW.md
 .agents/
 .codex/
 .claude/

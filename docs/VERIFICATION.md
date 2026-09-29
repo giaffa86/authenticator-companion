@@ -119,11 +119,11 @@ provider.
 |---|---|
 | Async proxy + `GetInitialResultSet` / `GetResultMetas` from GJS (host bus) | ✅ returns `["1119:1"]` and the live code |
 | Code equals independent TOTP computation | ✅ e.g. provider `262945` = local `262945` |
-| Code rotates at the TOTP period boundary | ✅ `262945 → 799240`, matches countdown |
+| Code rotates while the popup is open | ✅ `262945 → 799240` on the next 1 s refresh |
 | Extension loads in GNOME Shell 50.3 | ✅ state `1` (ACTIVE), no errors |
 | Panel list shows configured accounts | ✅ `test@example.com` / `OTP Panel Test` |
 | Codes hidden by default | ✅ label `••••••`, `revealed=false` |
-| Reveal shows the current code + countdown | ✅ `814033 · 2s`, equals a direct provider call in the same window |
+| Reveal shows the current code | ✅ `814033`, equals a direct provider call in the same window |
 | Click copies the current code | ✅ clipboard contained `791575`, exactly the provider code |
 | Row returns to masked after copy | ✅ `_code=null`, `revealed=false`, label `••••••` |
 | Auto-refresh on expiry while popup is open | ✅ `238645 → 868483` without user action, matches provider |
@@ -133,12 +133,12 @@ provider.
 | App unavailable / call error | ✅ shows "Authenticator is not available…" + **Open Authenticator** |
 | App **not installed** (provider name and desktop file absent) | ✅ extension still loads and shows the panel icon; popup reports "Authenticator is not installed.", no open-app entry, only one log line, and it retries about every 5 s instead of every second |
 | Provider gate returns empty (locked) **with the popup already open** | ✅ automatic 1 s tick cleared the rows and showed "No codes available. Authenticator is locked or has no accounts." |
-| Real passphrase-protected instance: popup open while locked | ✅ `rowCount:0`, "No codes available. Authenticator is locked or has no accounts." (`menuOpen:true`) |
-| Real instance: lock while a code is revealed (popup already open) | ✅ `revealed:true, code:"115254"` → next 1 s tick `rowCount:0` + locked status |
-| Real instance: fresh popup while still locked | ✅ close/reopen → `rowCount:0`, locked status |
-| Real instance: unlock restores list + live code | ✅ `rowCount:1`, `revealed:true`, `code:"115254"` after typing the passphrase |
+| Real passphrase-protected instance (current re-gate code): popup open while locked | ✅ `rowCount:0`, "No codes available. Authenticator is locked or has no accounts." (`menuOpen:true`) |
+| Real instance: lock while a code is revealed (popup already open) | ✅ `revealed:true, code:"482911"` → next tick `rowCount:0`, locked status, `revealed:[]` |
+| Real instance: fresh popup while still locked | ✅ close/reopen → `rowCount:0`, locked status, no code |
+| Real instance: unlock restores list + live code | ✅ `rowCount:10`, `revealed:["707060"]` after typing the passphrase |
 | Recovery after an empty/error state | ✅ list repopulates once the provider answers again |
-| Clean `disable()` | ✅ `_refreshId=0`, rows destroyed, `_button=null`, `_entry=null`, no error; re-enable returns to ACTIVE |
+| Clean `disable()` | ✅ refresh timer removed, rows destroyed, every owned reference (`_button`, `_entry`, `_section`, …) set to `null`, no error; re-enable returns to ACTIVE |
 | Closing the popup clears codes | ✅ rows destroyed, old row `_code=null`, `revealed=false` |
 | No global D-Bus filter / no notification interception | ✅ (source scan); no crash in the nested session |
 
@@ -148,14 +148,36 @@ the same moment):
 ```
 {"rows":1,"names":["test@example.com"],"providers":["OTP Panel Test"],
  "revealed":[false],"masked":["••••••"],"statusVisible":false,"menuOpen":true}
-{"revealed":true,"code":"814033","label":"814033  ·  2s","remaining":2}
+{"revealed":true,"code":"814033","label":"814033"}
 direct provider: clipboardText 814033
 clipboard after click: 791575  (equals provider code 791575)
 ```
 
+Re-verified on 2026-09-29 in a nested GNOME Shell 50.5 after the review
+cleanup (see `REVIEW.md`): with 10 real accounts, open → reveal → copy → close →
+`disable()` → `enable()` → open again listed all 10 rows, the code was cleared
+by the copy, `_button` was `null` after `disable()`, and no JS error was logged.
+
+Re-verified again on 2026-09-29 against the **current availability re-gate**
+(`_fetchFreshMeta` / `_tick` post-fetch gate) on a real passphrase-protected
+instance in a nested Shell 50.5, all 10 real accounts through `provider_proxy.js`:
+
+```
+unlocked, code shown:  {"rowCount":10,"status":null,"revealed":["482911"]}
+lock via app.lock:      gate -> [], observer -> {"rowCount":0,
+                        "status":"No codes available. Authenticator is locked or has no accounts.",
+                        "revealed":[]}
+fresh popup, locked:    {"rowCount":0,"status":"No codes available. Authenticator is locked or has no accounts.","revealed":[]}
+unlock (passphrase):    gate -> 10 ids, observer -> {"rowCount":10,"status":null,"revealed":["707060"]}
+```
+
+A real instance with a passphrase is required to run this: Authenticator 4.6.2
+enables its `lock` action only when `has_set_password` is true, so a completely
+unprotected instance cannot be locked over D-Bus.
+
 ### 2.3 What remains unverified
 
-> Tracked in `docs/OPEN_ITEMS.md` (OTP-001 … OTP-005), with priorities and
+> Tracked in `docs/OPEN_ITEMS.md` (OTP-001 … OTP-006), with priorities and
 > closure steps.
 
 - ~~A real passphrase-protected (locked) Authenticator.~~ **Closed** (OTP-001):
@@ -165,10 +187,14 @@ clipboard after click: 791575  (equals provider code 791575)
   availability gate in both directions with the popup open.
 - **`LaunchSearch` / `ActivateResult` from the extension.** Authenticator Companion copies the
   code itself instead of relying on Shell's result activation, so these methods
-  are not used. The "Open Authenticator" entry uses `Gio.DesktopAppInfo`; its
+  are not used. The "Open Authenticator" entry uses `Shell.AppSystem` /
+  `Shell.App.activate()`; its
   launch was not exercised end-to-end in the headless session.
 - **Non-Flatpak packaging.** Only the Flatpak build was tested.
-- **Very large account lists / many providers.** Tested with one account.
+- **Very large account lists.** Closed by `tools/inner_large_list_test.sh`
+  (200 accounts, filter, reveal, close) in the nested Shell 50.5; see
+  `docs/OPEN_ITEMS.md` OTP-004. Multiple providers are not a distinct path:
+  `description` is only a string in the metadata.
 - **The final installed instance in the current login session.** Because GNOME
   Shell 50 only scans extensions at startup, the extension installed in
   `~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86` is discovered only
@@ -207,7 +233,53 @@ gjs -m tools/dbustest.js
 
 # 3. same, but with the provider hidden to simulate "app not installed":
 OTP_SKIP_PROXY=1 ./tools/nested_env.sh /path/to/inner-test.sh
+
+# 4. deterministic lock / delayed-reply race test against tools/fake_provider.js
+rm -rf /tmp/otp-fake && mkdir -p /tmp/otp-fake && printf 'fake:1\n' > /tmp/otp-fake/ids && echo 111111 > /tmp/otp-fake/code
+OTP_PROVIDER=fake_provider.js ./tools/nested_env.sh tools/inner_race_test.sh
+
+# 5. large-list stress test (200 accounts) against the same fake provider
+rm -rf /tmp/otp-fake && mkdir -p /tmp/otp-fake
+OTP_PROVIDER=fake_provider.js ./tools/nested_env.sh tools/inner_large_list_test.sh
 ```
 
-`tools/` also contains `provider_proxy.js` and the test-only `unsafe_helper`
-extension; they are not shipped with Authenticator Companion.
+`tools/` also contains `provider_proxy.js`, `fake_provider.js` and the test-only
+`unsafe_helper` extension; they are not shipped with Authenticator Companion.
+
+## 4. Adversarial race verification (fake provider)
+
+`tools/inner_race_test.sh` runs against `tools/fake_provider.js`, a minimal
+SearchProvider2 implementation that mirrors Authenticator 4.6.2: `GetResultMetas`
+returns codes even while the control file marks the app locked, and replies can be
+delayed on demand. Clipboard writes are recorded by patching `St.Clipboard` in the
+shell, so a code reaching the clipboard is visible without a real clipboard.
+
+Run inside an isolated nested GNOME Shell 50.5 (see the command in §3). Result of
+the run on 2026-09-29 (re-run after the U01/U08 hardening), one fake account
+(`fake:1`, code `111111`):
+
+| Check | Observed |
+|---|---|
+| A. reveal shows the current code | ✅ code `111111`, row revealed, accessible name "Hide code" |
+| B. copy writes the code and drops it | ✅ one clipboard write, row code cleared, accessible name "Show code" |
+| C. lock before a copy of a cached id (H02) | ✅ no clipboard write, no code shown |
+| D. lock while a reveal's `GetResultMetas` is in flight (H01) | ✅ no code shown, row not revealed |
+| E. menu close while a delayed copy is in flight (H16) | ✅ no clipboard write, menu closed |
+| F. slow older reveal followed by a fast copy (H03) | ✅ copy wins, older reveal does not restore the code |
+| G. `disable()` while delayed reveal/copy are in flight, then `enable()` | ✅ no clipboard write, `_button`/`_service` null, re-enable lists and reveals again |
+| I. malformed metadata (missing `name`) | ✅ no rows, "Unexpected response from Authenticator." status, the JS error is logged exactly once in 10 s, and the popup recovers when the provider is repaired |
+| J. gear button | ✅ happy path sends `Activate`, then `ActivateAction('preferences')`, closes the popup and does not launch; a failing `ActivateAction` and a failing `Activate` each fall back to launching the app |
+
+`TOTAL pass=32 fail=0`. The only shell-log error is the single
+`[authenticator-companion]` line logged on purpose by case I; cases A–H and J
+produce none. The real-provider smoke test (open → reveal → copy with the
+10-account host instance through `provider_proxy.js`) also passed with no errors.
+
+### 4.1 Residual race the extension cannot close
+
+The extension now re-checks `GetInitialResultSet` before and after every reveal and
+copy, and every second while the popup is open, but `GetResultMetas` itself does not
+check the lock. A lock that completes between the final availability check and the
+clipboard/display update is therefore not revoked by the client. Closing that window
+completely requires a lock check inside Authenticator's `GetResultMetas`; it is
+tracked as OTP-006 in `docs/OPEN_ITEMS.md`.

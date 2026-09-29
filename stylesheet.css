@@ -44,31 +44,3 @@
     border-radius: 6px;
     margin-left: 4px;
 }
-
-/* Graphical TOTP countdown. The track stays in the layout but collapses to
-   zero height until a code is revealed, so masked rows are unaffected. */
-.authenticator-companion-timer {
-    width: 160px;
-    margin: 0;
-}
-
-.authenticator-companion-timer-active {
-    margin-top: 6px;
-    height: 4px;
-    border-radius: 2px;
-    background-color: rgba(128, 128, 128, 0.3);
-}
-
-.authenticator-companion-timer-fill {
-    height: 0px;
-    border-radius: 2px;
-    background-color: #3584e4;
-}
-
-.authenticator-companion-timer-fill-active {
-    height: 4px;
-}
-
-.authenticator-companion-timer-fill-low {
-    background-color: #e01b24;
-}

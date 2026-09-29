@@ -23,6 +23,10 @@ export GSETTINGS_BACKEND=keyfile
 gsettings set org.gnome.shell enabled-extensions "['$EXT_UUID', 'authenticator-companion-test-unsafe@giaffa86']" >/dev/null 2>&1 || true
 
 export HOST_DBUS_ADDRESS="$HOST_ADDR" INNER
+# Which provider to run on the private bus: the host-bridging proxy (default)
+# or tools/fake_provider.js for deterministic race tests.
+export OTP_PROVIDER="${OTP_PROVIDER:-provider_proxy.js}"
+export OTP_FAKE_DIR="${OTP_FAKE_DIR:-/tmp/otp-fake}"
 export OTP_SRC="$SRC" OTP_RUNTIME="$RUNTIME"
 export OTP_SKIP_PROXY="${OTP_SKIP_PROXY:-0}"
 # When simulating "app not installed", hide the Flatpak D-Bus service files so
@@ -32,8 +36,10 @@ if [ "$OTP_SKIP_PROXY" = "1" ]; then
 fi
 timeout "${OTP_TIMEOUT:-100}" dbus-run-session -- bash -c '
   set -u
+  PROXY=0
+  SHELL=""
   if [ "$OTP_SKIP_PROXY" != "1" ]; then
-    gjs -m "$OTP_SRC/tools/provider_proxy.js" >"$OTP_RUNTIME/proxy.log" 2>&1 &
+    gjs -m "$OTP_SRC/tools/$OTP_PROVIDER" >"$OTP_RUNTIME/proxy.log" 2>&1 &
     PROXY=$!
     sleep 2
   else
@@ -57,10 +63,12 @@ timeout "${OTP_TIMEOUT:-100}" dbus-run-session -- bash -c '
     sleep 1
   done
   bash "$INNER"; RC=$?
-  kill -9 $SHELL 2>/dev/null
-  [ "$PROXY" != "0" ] && kill -9 $PROXY 2>/dev/null
-  pkill -9 -f "gnome-shell --headless" 2>/dev/null
-  pkill -9 -f provider_proxy.js 2>/dev/null
+  # Kill only the processes this script started, by PID. Never use a pattern
+  # that could also match the login-shell gnome-shell.
+  kill -9 "$SHELL" 2>/dev/null
+  if [ "$PROXY" != "0" ]; then kill -9 "$PROXY" 2>/dev/null; fi
+  wait "$SHELL" 2>/dev/null
+  if [ "$PROXY" != "0" ]; then wait "$PROXY" 2>/dev/null; fi
   exit $RC
 ' 2>&1
 rm -rf "$RUNTIME" "$DATA" "$CFG" 2>/dev/null || true

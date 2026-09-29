@@ -1,27 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Authenticator Companion — GNOME Shell 50 extension.
-//
-// Shows the accounts configured in GNOME Authenticator (com.belmoussaoui.Authenticator)
-// in the top panel and copies the current one-time password with a click.
-//
-// Design constraints (see README.md):
-//   * Authenticator is the only source of truth. Accounts and codes are read
-//     exclusively through its org.gnome.Shell.SearchProvider2 D-Bus service.
-//   * No secret is ever imported, derived or read from the keyring.
-//   * No global D-Bus filter is installed (Gio.DBus.session.add_filter() must not
-//     be used: it crashes GNOME Shell 50 devkit sessions).
-//   * Codes are never written to GSettings, files, logs or notifications, and are
-//     kept in memory only while the popup is open and only for revealed rows.
-
-'use strict';
+// Authenticator Companion — GNOME Shell 50. See README.md for the security
+// model: Authenticator is the only source of accounts and codes, read through
+// its Search Provider D-Bus service; codes stay in memory only while shown.
 
 import Gio from 'gi://Gio';
-import GioUnix from 'gi://GioUnix';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Clutter from 'gi://Clutter';
 import Pango from 'gi://Pango';
+import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -29,7 +17,9 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-Gio._promisify(Gio.DBusProxy, 'new', 'new_finish');
+// The Shell itself already promisifies Gio.DBusProxy.new and
+// Gio.DBusConnection.prototype.call (environment.js), so only DBusProxy.call is
+// ours to promisify; Gio._promisify is idempotent.
 Gio._promisify(Gio.DBusProxy.prototype, 'call', 'call_finish');
 
 const APP_ID = 'com.belmoussaoui.Authenticator';
@@ -43,26 +33,18 @@ const IFACE = 'org.gnome.Shell.SearchProvider2';
 const APP_OBJECT_PATH = '/com/belmoussaoui/Authenticator';
 const PREFERENCES_ACTION = 'preferences';
 
-// How often the open popup re-checks availability and refreshes revealed codes.
-// This keeps the displayed code in sync with its expiry without any long-lived
-// caching. The timer only runs while the menu is open.
+// The open popup re-checks availability and refreshes revealed codes on each
+// tick, so displayed codes stay in sync without any long-lived caching.
 const REFRESH_INTERVAL_MS = 1000;
 
-// Fallback TOTP period, used only to draw the countdown before the real period
-// has been observed. The actual value is measured from code changes.
-const DEFAULT_PERIOD_SECONDS = 30;
-const MIN_PERIOD_SECONDS = 5;
-const MAX_PERIOD_SECONDS = 300;
-// The countdown bar switches to the warning color for the final stretch.
-const TIMER_LOW_FRACTION = 0.2;
-// Fixed width of the countdown bar (also set in stylesheet.css).
-const TIMER_WIDTH_PX = 160;
+// How long the "Copied to clipboard" confirmation stays on a row.
+const COPY_FEEDBACK_MS = 1500;
+
+// How long a reveal/copy result message is kept on the status line before the
+// periodic refresh is allowed to clear it.
+const ACTION_STATUS_MS = 4000;
 
 const MASK = '\u2022\u2022\u2022\u2022\u2022\u2022';
-
-function isCancelled(error) {
-    return !!error?.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED);
-}
 
 /**
  * Thin asynchronous client for Authenticator's Search Provider.
@@ -80,8 +62,7 @@ class AuthenticatorSearchProvider {
     }
 
     destroy() {
-        this._cancellable?.cancel();
-        this._cancellable = null;
+        this._cancellable.cancel();
         this._proxy = null;
     }
 
@@ -111,13 +92,13 @@ class AuthenticatorSearchProvider {
             this._cancellable);
     }
 
-    /** @returns {Promise<string[]>} all account identifiers, [] when none/locked */
+    // Returns [] when Authenticator is locked or has no accounts.
     async listAccountIds() {
         const result = await this._call(
             'GetInitialResultSet',
             new GLib.Variant('(as)', [['']]));
         const [ids] = result.recursiveUnpack();
-        return Array.isArray(ids) ? ids : [];
+        return ids;
     }
 
     /**
@@ -127,26 +108,21 @@ class AuthenticatorSearchProvider {
      * @returns {Promise<Array<{id: string, name: string, description: string, code: ?string}>>}
      */
     async getResultMetas(ids) {
-        if (ids.length === 0)
-            return [];
-
         const result = await this._call(
             'GetResultMetas',
             new GLib.Variant('(as)', [ids]));
         const [metas] = result.recursiveUnpack();
-        return (metas ?? []).map(meta => ({
+        return metas.map(meta => ({
             id: meta.id,
-            name: meta.name ?? '',
+            name: meta.name,
             description: meta.description ?? '',
             code: meta.clipboardText ?? null,
         }));
     }
 }
 
-/**
- * One account row: name + provider, a masked code and a reveal button.
- * Activating the row copies the current code (fetched fresh by the caller).
- */
+// One account row: provider label, masked code and reveal button; activating
+// the row copies the current code.
 const AccountMenuItem = GObject.registerClass(
 class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
     _init(meta, {onReveal, onCopy}) {
@@ -161,11 +137,9 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
 
         this._code = null;
         this._revealed = false;
-        this._period = DEFAULT_PERIOD_SECONDS;
-        this._lastChangeMs = 0;
-        this._expiryMs = 0;
         this._copied = false;
         this._copyResetId = 0;
+        this._actionToken = 0;
 
         const box = new St.BoxLayout({
             orientation: Clutter.Orientation.VERTICAL,
@@ -180,26 +154,15 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
             text: meta.description,
             style_class: 'authenticator-companion-subtitle',
         });
-        this._subtitle.clutter_text.ellipsize = 1;
+        this._subtitle.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         this._codeLabel = new St.Label({
             text: MASK,
             style_class: 'authenticator-companion-code',
         });
 
-        // Countdown bar shown under a revealed code. It has a fixed width
-        // (see stylesheet.css) and collapses to zero height while masked.
-        this._timer = new St.BoxLayout({
-            style_class: 'authenticator-companion-timer',
-        });
-        this._timerFill = new St.Widget({
-            style_class: 'authenticator-companion-timer-fill',
-        });
-        this._timer.add_child(this._timerFill);
-
         box.add_child(this._title);
         box.add_child(this._subtitle);
         box.add_child(this._codeLabel);
-        box.add_child(this._timer);
         this.add_child(box);
 
         this._revealButton = new St.Button({
@@ -216,16 +179,32 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
         this.add_child(this._revealButton);
 
         this.connect('activate', () => this._onCopy(this));
+        this.connect('destroy', () => {
+            if (this._copyResetId) {
+                GLib.source_remove(this._copyResetId);
+                this._copyResetId = 0;
+            }
+            this._code = null;
+        });
     }
 
     get revealed() {
         return this._revealed;
     }
 
-    /** Case-insensitive match on account and provider name. */
+    /**
+     * Claim this row for a new reveal/copy. Any earlier request's token is now
+     * stale, so a late D-Bus reply cannot overwrite the newer action's result.
+     */
+    beginAction() {
+        return ++this._actionToken;
+    }
+
+    isCurrentAction(token) {
+        return token === this._actionToken;
+    }
+
     matches(term) {
-        if (!term)
-            return true;
         const needle = term.toLowerCase();
         return this.accountName.toLowerCase().includes(needle) ||
             this.providerName.toLowerCase().includes(needle);
@@ -236,48 +215,32 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
         this._revealIcon.icon_name = revealed
             ? 'view-conceal-symbolic'
             : 'view-reveal-symbolic';
+        this._revealButton.accessible_name = revealed ? _('Hide code') : _('Show code');
         this._renderCode();
     }
 
-    /** Update the cached code and detect the account's TOTP period. */
     setCode(code) {
-        const nowMs = GLib.get_real_time() / 1000;
-        if (this._code !== null && code !== this._code && this._lastChangeMs > 0) {
-            const measured = Math.round((nowMs - this._lastChangeMs) / 1000);
-            if (measured >= MIN_PERIOD_SECONDS && measured <= MAX_PERIOD_SECONDS)
-                this._period = measured;
-        }
-        if (code !== this._code)
-            this._lastChangeMs = nowMs;
         this._code = code;
-        this._expiryMs = this._periodEndMs(nowMs);
         this._renderCode();
     }
 
-    /** Drop the code from memory and mask the row again. */
-    clearCode() {
+    forgetCode() {
         this._code = null;
-        this._revealed = false;
-        this._expiryMs = 0;
-        this._revealIcon.icon_name = 'view-reveal-symbolic';
-        this._codeLabel.text = MASK;
-        this._codeLabel.remove_style_class_name('authenticator-companion-code-visible');
-        this._updateTimer();
     }
 
-    _periodEndMs(nowMs) {
-        const period = this._period;
-        const nowSeconds = Math.floor(nowMs / 1000);
-        const nextBoundary = (Math.floor(nowSeconds / period) + 1) * period;
-        return nextBoundary * 1000;
+    clearCopied() {
+        this._copied = false;
+        if (this._copyResetId) {
+            GLib.source_remove(this._copyResetId);
+            this._copyResetId = 0;
+        }
     }
 
-    /** Seconds left before the displayed code is expected to change. */
-    remainingSeconds() {
-        if (this._expiryMs === 0)
-            return 0;
-        const left = Math.ceil((this._expiryMs - GLib.get_real_time() / 1000) / 1000);
-        return Math.max(0, left);
+    clearCode() {
+        this._actionToken++;
+        this._code = null;
+        this.clearCopied();
+        this.setRevealed(false);
     }
 
     _renderCode() {
@@ -285,44 +248,12 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
             this._codeLabel.text = _('Copied to clipboard');
             this._codeLabel.add_style_class_name('authenticator-companion-code-visible');
         } else if (this._revealed && this._code !== null) {
-            this._codeLabel.text = `${this._code}  \u00b7  ${this.remainingSeconds()}s`;
+            this._codeLabel.text = this._code;
             this._codeLabel.add_style_class_name('authenticator-companion-code-visible');
         } else {
             this._codeLabel.text = MASK;
             this._codeLabel.remove_style_class_name('authenticator-companion-code-visible');
         }
-        this._updateTimer();
-    }
-
-    /** Keep the graphical countdown in sync with the remaining seconds. */
-    _updateTimer() {
-        const active = this._revealed && this._code !== null && !this._copied;
-
-        if (active) {
-            this._timer.add_style_class_name('authenticator-companion-timer-active');
-            this._timerFill.add_style_class_name('authenticator-companion-timer-fill-active');
-
-            const fraction = this._period > 0
-                ? Math.min(1, Math.max(0, this.remainingSeconds() / this._period))
-                : 0;
-            this._timerFill.set_width(Math.round(TIMER_WIDTH_PX * fraction));
-
-            if (fraction <= TIMER_LOW_FRACTION)
-                this._timerFill.add_style_class_name('authenticator-companion-timer-fill-low');
-            else
-                this._timerFill.remove_style_class_name('authenticator-companion-timer-fill-low');
-        } else {
-            this._timer.remove_style_class_name('authenticator-companion-timer-active');
-            this._timerFill.remove_style_class_name('authenticator-companion-timer-fill-active');
-            this._timerFill.remove_style_class_name('authenticator-companion-timer-fill-low');
-            this._timerFill.set_width(0);
-        }
-    }
-
-    /** Refresh the countdown label on each tick (no D-Bus call needed). */
-    tick() {
-        if (this._revealed && !this._copied && this._code !== null)
-            this._renderCode();
     }
 
     flashCopied() {
@@ -332,7 +263,7 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
             GLib.source_remove(this._copyResetId);
         this._copyResetId = GLib.timeout_add(
             GLib.PRIORITY_DEFAULT,
-            1500,
+            COPY_FEEDBACK_MS,
             () => {
                 this._copyResetId = 0;
                 this._copied = false;
@@ -340,26 +271,24 @@ class AccountMenuItem extends PopupMenu.PopupBaseMenuItem {
                 return GLib.SOURCE_REMOVE;
             });
     }
-
-    destroy() {
-        if (this._copyResetId) {
-            GLib.source_remove(this._copyResetId);
-            this._copyResetId = 0;
-        }
-        this._code = null;
-        super.destroy();
-    }
 });
 
 export default class AuthenticatorCompanionExtension extends Extension {
+    _generation = 0;
+
     enable() {
+        // A new generation invalidates every continuation from a previous
+        // enable()/disable() cycle, which may still be waiting on D-Bus.
+        this._generation++;
         this._service = new AuthenticatorSearchProvider();
+        this._settingsCancellable = new Gio.Cancellable();
         this._rows = [];
         this._refreshId = 0;
         this._busy = false;
         this._lastIds = [];
         this._lastErrorText = null;
         this._tickCounter = 0;
+        this._statusHoldUntil = 0;
 
         this._button = new PanelMenu.Button(0.5, _('Authenticator Companion'), false);
         this._button.add_child(new St.Icon({
@@ -369,7 +298,6 @@ export default class AuthenticatorCompanionExtension extends Extension {
 
         const menu = this._button.menu;
 
-        // Search entry (client-side filter by account/provider name).
         const searchItem = new PopupMenu.PopupBaseMenuItem({
             reactive: false,
             can_focus: false,
@@ -406,7 +334,6 @@ export default class AuthenticatorCompanionExtension extends Extension {
         this._entryTextChangedId =
             this._entry.clutter_text.connect('text-changed', () => this._filter());
 
-        // Status placeholder (loading / locked / unavailable).
         this._statusItem = new PopupMenu.PopupMenuItem('', {reactive: false});
         this._statusItem.label.add_style_class_name('authenticator-companion-status');
         menu.addMenuItem(this._statusItem);
@@ -421,90 +348,75 @@ export default class AuthenticatorCompanionExtension extends Extension {
             x_expand: true,
         });
         this._scrollView.set_child(this._section.actor);
+        // Inserted directly instead of through addMenuItem(): a row copies on
+        // activation without closing the popup, so the "Copied" confirmation
+        // stays visible.
         menu.box.add_child(this._scrollView);
 
-        // "Open Authenticator" action, shown with the status.
         this._openItem = new PopupMenu.PopupMenuItem(_('Open Authenticator'));
         this._openItem.connect('activate', () => this._openAuthenticator());
         menu.addMenuItem(this._openItem);
 
-        this._menuOpenId = menu.connect('open-state-changed',
-            (_menu, open) => open ? this._onMenuOpen() : this._onMenuClose());
+        this._menuOpenId = menu.connect('open-state-changed', (_menu, open) => {
+            if (open)
+                this._onMenuOpen();
+            else
+                this._onMenuClose();
+        });
 
         Main.panel.addToStatusArea(this.uuid, this._button);
     }
 
     disable() {
+        // A new generation makes every in-flight continuation return at its
+        // next await, before the D-Bus calls are cancelled.
+        this._generation++;
+        this._settingsCancellable.cancel();
+        this._settingsCancellable = null;
         if (this._refreshId) {
             GLib.source_remove(this._refreshId);
             this._refreshId = 0;
         }
 
-        if (this._entryTextChangedId) {
-            this._entry?.clutter_text.disconnect(this._entryTextChangedId);
-            this._entryTextChangedId = 0;
-        }
-
-        if (this._menuOpenId) {
-            this._button?.menu.disconnect(this._menuOpenId);
-            this._menuOpenId = 0;
-        }
+        this._entry.clutter_text.disconnect(this._entryTextChangedId);
+        this._button.menu.disconnect(this._menuOpenId);
 
         this._clearRows();
-
-        if (this._entry) {
-            this._entry.destroy();
-            this._entry = null;
-        }
-
-        if (this._settingsButton) {
-            this._settingsButton.destroy();
-            this._settingsButton = null;
-        }
-
-        if (this._section) {
-            this._section.destroy();
-            this._section = null;
-        }
-
-        if (this._scrollView) {
-            this._scrollView.destroy();
-            this._scrollView = null;
-        }
-
-        if (this._statusItem) {
-            this._statusItem.destroy();
-            this._statusItem = null;
-        }
-
-        if (this._openItem) {
-            this._openItem.destroy();
-            this._openItem = null;
-        }
-
-        this._button?.destroy();
+        this._entry.destroy();
+        this._entry = null;
+        this._settingsButton.destroy();
+        this._settingsButton = null;
+        this._section.destroy();
+        this._section = null;
+        this._scrollView.destroy();
+        this._scrollView = null;
+        this._statusItem.destroy();
+        this._statusItem = null;
+        this._openItem.destroy();
+        this._openItem = null;
+        this._button.destroy();
         this._button = null;
-
-        this._service?.destroy();
+        this._service.destroy();
         this._service = null;
     }
-
-    // --- menu lifecycle -----------------------------------------------------
 
     _onMenuOpen() {
         this._tickCounter = 0;
         this._lastErrorText = null;
-        this._setStatus(_('Loading\u2026'), {open: false});
-        this._refresh().catch(e => this._reportError(e));
-        if (!this._refreshId) {
-            this._refreshId = GLib.timeout_add(
-                GLib.PRIORITY_DEFAULT,
-                REFRESH_INTERVAL_MS,
-                () => {
-                    this._tick().catch(e => this._reportError(e));
-                    return GLib.SOURCE_CONTINUE;
-                });
-        }
+        this._statusHoldUntil = 0;
+        this._busy = false;
+        // A previous session's continuation may still be running; the new
+        // session must not be blocked by it. The generation checks discard any
+        // stale continuation that loses the race.
+        this._setStatus(_('Loading\u2026'), false);
+        this._refresh();
+        this._refreshId = GLib.timeout_add(
+            GLib.PRIORITY_DEFAULT,
+            REFRESH_INTERVAL_MS,
+            () => {
+                this._tick();
+                return GLib.SOURCE_CONTINUE;
+            });
     }
 
     _onMenuClose() {
@@ -512,45 +424,36 @@ export default class AuthenticatorCompanionExtension extends Extension {
             GLib.source_remove(this._refreshId);
             this._refreshId = 0;
         }
-        this._entry?.set_text('');
-        // Never keep codes around once the popup is closed.
-        for (const row of this._rows)
-            row.clearCode();
+        // Close invalidates pending refreshes and row actions alike.
+        this._generation++;
+        this._statusHoldUntil = 0;
+        this._entry.set_text('');
+        // Never keep codes around once the popup is closed: destroying the
+        // rows also drops the codes they hold.
         this._clearRows();
         this._lastIds = [];
     }
 
-    // --- data flow ----------------------------------------------------------
-
     async _refresh() {
         if (this._busy)
             return;
+        const generation = this._generation;
         this._busy = true;
         try {
-            const ids = await this._service.listAccountIds();
-            if (ids.length === 0) {
-                this._clearRows();
-                this._lastIds = [];
-                this._setStatus(
-                    _('No codes available. Authenticator is locked or has no accounts.'),
-                    {open: true});
+            await this._syncAccounts(generation);
+        } catch (e) {
+            if (!(e instanceof GLib.Error))
+                throw e;
+            if (generation !== this._generation)
                 return;
-            }
-
-            if (!this._sameIds(ids)) {
-                const metas = await this._service.getResultMetas(ids);
-                this._rebuildRows(metas);
-                this._lastIds = ids;
-            }
-            this._setStatus(null, {open: false});
-            this._lastErrorText = null;
+            this._reportError(e);
         } finally {
             this._busy = false;
         }
     }
 
     async _tick() {
-        if (this._busy || !this._button?.menu.isOpen)
+        if (this._busy)
             return;
 
         // While the provider is unreachable, retry about every 5 s instead of
@@ -559,35 +462,11 @@ export default class AuthenticatorCompanionExtension extends Extension {
         if (this._lastErrorText !== null && this._tickCounter % 5 !== 0)
             return;
 
+        const generation = this._generation;
         this._busy = true;
         try {
-            // Availability gate: the provider returns an empty set while the app
-            // is locked, so this also honours a lock happening with the popup
-            // already open. GetResultMetas is only ever called for ids returned
-            // by the current gate.
-            const ids = await this._service.listAccountIds();
-            if (ids.length === 0) {
-                this._clearRows();
-                this._lastIds = [];
-                this._setStatus(
-                    _('No codes available. Authenticator is locked or has no accounts.'),
-                    {open: true});
+            if (!await this._syncAccounts(generation))
                 return;
-            }
-            this._lastErrorText = null;
-
-            // The account set changed while the popup was open (lock/unlock,
-            // account added or removed): rebuild so the list and the settings
-            // shortcut stay in sync with the current availability.
-            if (!this._sameIds(ids)) {
-                const metas = await this._service.getResultMetas(ids);
-                this._rebuildRows(metas);
-                this._lastIds = ids;
-            }
-            this._setStatus(null, {open: false});
-
-            for (const row of this._rows)
-                row.tick();
 
             const revealedIds = this._rows
                 .filter(row => row.revealed)
@@ -595,16 +474,93 @@ export default class AuthenticatorCompanionExtension extends Extension {
 
             if (revealedIds.length > 0) {
                 const metas = await this._service.getResultMetas(revealedIds);
+                if (generation !== this._generation)
+                    return;
+
+                // GetResultMetas ignores the lock state, so confirm the ids are
+                // still available after the codes were fetched, and drop them
+                // if Authenticator locked in the meantime.
+                const available = new Set(await this._service.listAccountIds());
+                if (generation !== this._generation)
+                    return;
+
                 const byId = new Map(metas.map(m => [m.id, m]));
                 for (const row of this._rows) {
+                    if (!available.has(row.accountId)) {
+                        row.clearCode();
+                        continue;
+                    }
                     const meta = byId.get(row.accountId);
                     if (meta && row.revealed)
                         row.setCode(meta.code);
                 }
             }
+        } catch (e) {
+            if (!(e instanceof GLib.Error))
+                throw e;
+            if (generation !== this._generation)
+                return;
+            this._reportError(e);
         } finally {
             this._busy = false;
         }
+    }
+
+    /**
+     * Availability gate and account rebuild, shared by the initial refresh and
+     * the periodic tick. GetInitialResultSet is authoritative: it returns an
+     * empty set while Authenticator is locked, so this also honours a lock
+     * happening with the popup already open, and GetResultMetas is only ever
+     * called for ids this gate returned.
+     * @returns {Promise<boolean>} whether accounts are currently available.
+     */
+    async _syncAccounts(generation) {
+        const ids = await this._service.listAccountIds();
+        if (generation !== this._generation)
+            return false;
+
+        if (ids.length === 0) {
+            // The provider answered, so the app is reachable: a previous error
+            // must not keep the retry throttle on while it is merely locked.
+            this._lastErrorText = null;
+            this._generation++;
+            this._clearRows();
+            this._lastIds = [];
+            this._setStatus(
+                _('No codes available. Authenticator is locked or has no accounts.'),
+                true);
+            return false;
+        }
+
+        // The account set changed while the popup was open (lock/unlock,
+        // account added or removed): rebuild so the list and the settings
+        // shortcut stay in sync with the current availability.
+        if (!this._sameIds(ids)) {
+            const metas = await this._service.getResultMetas(ids);
+            if (generation !== this._generation)
+                return false;
+            // Record the ids before the rebuild so a thrown constructor does
+            // not make the next tick repeat the full fetch.
+            this._lastIds = ids;
+            // Rebuilding destroys the rows, so invalidate their actions first.
+            this._generation++;
+            try {
+                this._rebuildRows(metas);
+            } catch (e) {
+                // A provider contract violation (for example a row without the
+                // required `name`) must not leave an empty, unrecoverable
+                // popup: log it once, show a message and drop the cached ids so
+                // a later retry recovers when the provider is fixed again.
+                this._reportError(e, _('Unexpected response from Authenticator.'));
+                return false;
+            }
+        }
+        // A usable account set answered: clear any error state, but keep a
+        // recent reveal/copy message on screen long enough to be read.
+        this._lastErrorText = null;
+        if (Date.now() >= this._statusHoldUntil)
+            this._setStatus(null, false);
+        return true;
     }
 
     _sameIds(ids) {
@@ -632,152 +588,215 @@ export default class AuthenticatorCompanionExtension extends Extension {
     }
 
     _filter() {
-        const term = this._entry?.get_text().trim() ?? '';
+        const term = this._entry.get_text().trim();
         for (const row of this._rows)
             row.visible = row.matches(term);
     }
 
-    // --- actions ------------------------------------------------------------
+    /**
+     * Fetch one account's metadata behind the authoritative availability gate.
+     * The row id came from an earlier gate result, so re-check it now, and
+     * re-check once more after fetching the code: GetResultMetas does not
+     * enforce the lock itself, so a lock that happens while the request is in
+     * flight must not produce a displayed or copied code.
+     * @returns {Promise<?object>} metadata, or null when unavailable/stale.
+     */
+    async _fetchFreshMeta(accountId, generation) {
+        const ids = await this._service.listAccountIds();
+        if (generation !== this._generation || !ids.includes(accountId))
+            return null;
+
+        const [meta] = await this._service.getResultMetas([accountId]);
+        if (generation !== this._generation || !meta || meta.id !== accountId)
+            return null;
+
+        const stillAvailable = await this._service.listAccountIds();
+        if (generation !== this._generation || !stillAvailable.includes(accountId))
+            return null;
+        return meta;
+    }
 
     async _reveal(row) {
         if (row.revealed) {
-            row.setRevealed(false);
             row.clearCode();
             return;
         }
 
+        const generation = this._generation;
+        const token = row.beginAction();
         try {
-            const [meta] = await this._service.getResultMetas([row.accountId]);
+            const meta = await this._fetchFreshMeta(row.accountId, generation);
+            if (generation !== this._generation || !row.isCurrentAction(token))
+                return;
             if (!meta) {
                 row.clearCode();
                 return;
             }
+            if (!meta.code) {
+                row.clearCode();
+                this._showActionStatus(
+                    _('No code available for this account.'), false);
+                return;
+            }
+            row.clearCopied();
             row.setRevealed(true);
             row.setCode(meta.code);
         } catch (e) {
-            if (!isCancelled(e))
-                this._reportError(e);
+            if (!(e instanceof GLib.Error))
+                throw e;
+            if (generation !== this._generation)
+                return;
+            this._actionError();
         }
     }
 
     async _copy(row) {
+        const generation = this._generation;
+        const token = row.beginAction();
         try {
-            // Always fetch a fresh code right before copying.
-            const [meta] = await this._service.getResultMetas([row.accountId]);
-            if (!meta?.code) {
-                this._setStatus(
-                    _('No codes available. Authenticator is locked or has no accounts.'),
-                    {open: true});
+            const meta = await this._fetchFreshMeta(row.accountId, generation);
+            if (generation !== this._generation || !row.isCurrentAction(token))
+                return;
+            if (!meta || !meta.code) {
+                this._showActionStatus(
+                    _('No code available for this account.'), false);
                 return;
             }
             St.Clipboard.get_default().set_text(
                 St.ClipboardType.CLIPBOARD, meta.code);
             row.flashCopied();
-            // The code is intentionally dropped as soon as it is copied and the
-            // row goes back to masked; only the short-lived "Copied"
-            // confirmation stays on screen.
+            // The code is dropped as soon as it is copied; only the short-lived
+            // "Copied" confirmation stays on screen.
             row.setRevealed(false);
-            row._code = null;
+            row.forgetCode();
         } catch (e) {
-            if (!isCancelled(e))
-                this._reportError(e);
+            if (!(e instanceof GLib.Error))
+                throw e;
+            if (generation !== this._generation)
+                return;
+            this._actionError();
         }
+    }
+
+    _lookupApp() {
+        return Shell.AppSystem.get_default().lookup_app(DESKTOP_FILE);
+    }
+
+    _isInstalled() {
+        return this._lookupApp() !== null;
     }
 
     _openAuthenticator() {
-        const app = GioUnix.DesktopAppInfo.new(DESKTOP_FILE);
-        if (!app) {
-            this._setStatus(_('Authenticator is not installed.'), {open: false});
-            return;
-        }
-        this._button?.menu.close();
-        app.launch([], null);
+        const app = this._lookupApp();
+        if (app)
+            app.activate();
     }
 
-    _openSettings() {
+    async _openSettings() {
         // Authenticator's `preferences` action assumes the main window already
         // exists: its handler calls app.active_window(), which unwraps a None
         // and panics (SIGABRT) when the app was started as a D-Bus service by
         // the search provider (no window yet). Activate the app first so the
         // window is created, then activate the preferences action; if the app
         // is not reachable at all, fall back to just launching it.
-        const activateParams = new GLib.Variant('(a{sv})', [{}]);
-
-        Gio.DBus.session.call(
-            APP_ID,
-            APP_OBJECT_PATH,
-            'org.freedesktop.Application',
-            'Activate',
-            activateParams,
-            null,
-            Gio.DBusCallFlags.NONE,
-            -1,
-            null,
-            (connection, res) => {
-                try {
-                    connection.call_finish(res);
-                } catch (e) {
-                    this._openAuthenticator();
-                    return;
-                }
-                this._activatePreferences();
-            });
+        //
+        // The ordered pair is sent with raw Gio.DBusConnection.call instead of
+        // Shell.App.activate_action() because there is no tracked Shell.App
+        // window yet to derive a launch context from, and the two calls must be
+        // awaited in order. No activation token is forwarded; on Wayland the
+        // raised window relies on the app's own present() (docs/VERIFICATION.md).
+        const cancellable = this._settingsCancellable;
+        this._button.menu.close();
+        try {
+            await Gio.DBus.session.call(
+                APP_ID,
+                APP_OBJECT_PATH,
+                'org.freedesktop.Application',
+                'Activate',
+                new GLib.Variant('(a{sv})', [{}]),
+                null,
+                Gio.DBusCallFlags.NONE,
+                -1,
+                cancellable);
+        } catch (e) {
+            if (!(e instanceof GLib.Error))
+                throw e;
+            if (!cancellable.is_cancelled())
+                this._openAuthenticator();
+            return;
+        }
+        if (cancellable.is_cancelled())
+            return;
+        await this._activatePreferences(cancellable);
     }
 
-    _activatePreferences() {
-        const params = new GLib.Variant('(sava{sv})', [PREFERENCES_ACTION, [], {}]);
-
-        Gio.DBus.session.call(
-            APP_ID,
-            APP_OBJECT_PATH,
-            'org.freedesktop.Application',
-            'ActivateAction',
-            params,
-            null,
-            Gio.DBusCallFlags.NONE,
-            -1,
-            null,
-            (connection, res) => {
-                try {
-                    connection.call_finish(res);
-                    this._button?.menu.close();
-                } catch (e) {
-                    this._openAuthenticator();
-                }
-            });
+    async _activatePreferences(cancellable) {
+        try {
+            await Gio.DBus.session.call(
+                APP_ID,
+                APP_OBJECT_PATH,
+                'org.freedesktop.Application',
+                'ActivateAction',
+                new GLib.Variant('(sava{sv})', [PREFERENCES_ACTION, [], {}]),
+                null,
+                Gio.DBusCallFlags.NONE,
+                -1,
+                cancellable);
+        } catch (e) {
+            if (!(e instanceof GLib.Error))
+                throw e;
+            if (!cancellable.is_cancelled())
+                this._openAuthenticator();
+        }
     }
 
-    // --- status -------------------------------------------------------------
+    /**
+     * Show a reveal/copy result without letting the next periodic refresh wipe
+     * it within the same second.
+     */
+    _showActionStatus(text, showOpen) {
+        this._statusHoldUntil = Date.now() + ACTION_STATUS_MS;
+        this._setStatus(text, showOpen);
+    }
 
-    _setStatus(text, {open}) {
+    _setStatus(text, showOpen) {
         this._statusItem.visible = text !== null;
         if (text !== null)
             this._statusItem.label.text = text;
-        this._openItem.visible = !!open;
+        this._openItem.visible = showOpen;
         // The settings shortcut is only relevant when accounts are available,
         // which is exactly the state in which no status message is shown.
         this._settingsButton.visible = text === null;
     }
 
-    _reportError(error) {
-        if (isCancelled(error))
-            return;
+    _unavailableText(installed) {
+        return installed
+            ? _('Authenticator is not available. Make sure it is running.')
+            : _('Authenticator is not installed.');
+    }
+
+    _actionError() {
+        const installed = this._isInstalled();
+        this._showActionStatus(this._unavailableText(installed), installed);
+    }
+
+    _reportError(error, message = null) {
+        this._generation++;
         this._clearRows();
         this._lastIds = [];
 
         // Tell "not installed" apart from "installed but unreachable" so the
         // message is accurate and the open-app entry is only shown when there
-        // is actually something to open.
-        const installed = !!GioUnix.DesktopAppInfo.new(DESKTOP_FILE);
-        const text = installed
-            ? _('Authenticator is not available. Make sure it is running.')
-            : _('Authenticator is not installed.');
+        // is actually something to open. A caller-supplied message (provider
+        // contract violation) replaces both.
+        const installed = message === null && this._isInstalled();
+        const text = message ?? this._unavailableText(installed);
 
         // Log once per state change, never once per retry.
         if (text !== this._lastErrorText) {
             console.error(`[authenticator-companion] ${error}`);
             this._lastErrorText = text;
         }
-        this._setStatus(text, {open: installed});
+        this._setStatus(text, installed);
     }
 }

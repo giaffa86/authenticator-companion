@@ -9,8 +9,9 @@ lost. `docs/VERIFICATION.md` §2.3 is the evidence source.
 | OTP-001 | Real passphrase-protected (locked) Authenticator not exercised end-to-end | High | **Closed** |
 | OTP-002 | `LaunchSearch` / `ActivateResult` not used by the extension | Low | Accepted |
 | OTP-003 | Non-Flatpak packaging not tested | Low | Open |
-| OTP-004 | Large account lists / multiple providers not stress-tested | Low | Open |
-| OTP-005 | Installed copy in the live login session not exercised (needs next login) | Medium | Open |
+| OTP-004 | Large account lists / multiple providers not stress-tested | Low | **Closed** |
+| OTP-005 | Installed copy in the live login session not exercised (needs next login) | Medium | Open — recorded, needs user logout/login |
+| OTP-006 | Lock is not enforced inside the provider's `GetResultMetas`, leaving a narrow client-side race | High | **Open — needs provider fix or explicit acceptance** |
 
 ---
 
@@ -35,7 +36,7 @@ unlocked by typing the passphrase.
 - Step 5 (unlock restores data) — popup open after unlocking:
   `rowCount:1`, `revealed:true`, `code:"115254"`, `status:null`.
 - Step 3 (lock while a code is revealed) — lock triggered while
-  `revealed:true, code:"115254", label:"115254  ·  2s"`; the next 1 s tick
+  `revealed:true, code:"115254"`; the next 1 s tick
   reported `rowCount:0, status:"No codes available. Authenticator is locked or has no accounts."`
   with `menuOpen:true`.
 - Step 4 (fresh popup while locked) — after close/reopen with the popup still
@@ -64,6 +65,14 @@ unlocked by typing the passphrase.
 **Closure criteria.** Met: step 3 shows no code and no stale row after locking,
 and step 5 restores data — observed on a real passphrase-protected instance.
 
+**Re-verification (2026-09-29, current re-gate code).** Repeated against the
+current `_fetchFreshMeta` / `_tick` post-fetch gate on a real passphrase-protected
+instance in a nested Shell 50.5: unlocked code `482911`, lock → gate `[]` and
+`rowCount:0` with the locked status, fresh popup while locked → no code, unlock →
+`rowCount:10` and code `707060`. See `docs/VERIFICATION.md` §2.2. The current
+instance only became lockable after the user set a passphrase, because
+Authenticator 4.6.2 enables `app.lock` only when `has_set_password` is true.
+
 **Note.** Because `GetResultMetas` ignores the lock state, the gate
 (`GetInitialResultSet`) is the only safe source of truth; do not replace it with
 a direct `GetResultMetas` call for cached ids.
@@ -82,13 +91,54 @@ Authenticator should expose the same service; verify if needed.
 
 ## OTP-004 — Large account lists not stress-tested
 
-Runtime tests used a single account. Check scrolling, filtering and the 1 s
-refresh with many accounts and providers.
+**Status:** closed on 2026-09-29 with `tools/inner_large_list_test.sh` against
+`tools/fake_provider.js` in a nested GNOME Shell 50.5. With 200 accounts all rows
+were built (`rowCount=200`), the client-side filter reduced the list to the single
+matching account, reveal showed the code on the filtered row, and closing the
+popup dropped all rows and codes. `TOTAL pass=6 fail=0`, no extension errors.
+
+Multiple *providers* are not meaningful for this extension: the account's
+`description` is just a string in `GetResultMetas`, and the UI only groups no
+accounts by provider. The 200-row run covers the scrolling/filtering path.
 
 ## OTP-005 — Installed copy in the live login session not exercised
 
-GNOME Shell 50 enumerates extensions only at startup, so the copy installed in
+**Status:** recorded residual, requires the user's next logout/login. GNOME Shell
+50 enumerates extensions only at startup, so the copy installed in
 `~/.local/share/gnome-shell/extensions/authenticator-companion@giaffa86` is picked up after the
-next login. The runtime tests used a fresh nested Shell 50.3 that loaded the same
-code. Close by logging out/in once and confirming the panel button appears and
-the menu works.
+next login. This is standard Shell behavior, not an extension code path: the
+nested-shell runs load the exact same three files through the same
+`ExtensionManager` enable/disable path, so the remaining risk is discovery, not
+behaviour.
+
+**Closure:** log out and back in once, confirm the panel button appears and the
+menu works. This is the only item that cannot be closed without the user.
+
+---
+
+## OTP-006 — Provider does not check the lock in `GetResultMetas`
+
+**Declared in:** `docs/VERIFICATION.md` §4.1 and README "Security and privacy model".
+
+**What is affected:** the guarantee "no code is shown or copied after Authenticator
+locks". Authenticator 4.6.2 returns `[]` from `GetInitialResultSet` while locked,
+but `GetResultMetas` has no lock check (upstream `src/application.rs`).
+
+**What the extension does now:** before and after every reveal/copy it re-runs the
+`GetInitialResultSet` gate, and it does the same every second while the popup is
+open. A lock observed by any of those checks drops the code instead of displaying
+or copying it, and a late reply from an older action is discarded.
+
+**Residual risk:** if the app locks in the small interval between the extension's
+final gate check and the `St.Clipboard`/label update, that single code still gets
+through until the next tick clears it. No client can close this window, because
+the only call that returns the code (`GetResultMetas`) ignores the lock.
+
+**How to close it (provider side):** in Authenticator, make `GetResultMetas`
+return no metadata (or omit `clipboardText`) when `is_locked()`, the same way
+`GetInitialResultSet` already does. That makes the gate and the code read
+consistent and removes the race.
+
+**Closure criteria:** either the upstream provider enforces the lock in
+`GetResultMetas`, or the limitation is explicitly accepted and the README/docs
+keep stating it precisely.
