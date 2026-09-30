@@ -13,8 +13,6 @@
 //   ids             -> newline-separated result ids (default "fake:1")
 //   code            -> clipboardText returned by GetResultMetas
 //   omit_name       -> drop the required `name` key (malformed metadata)
-//   fail_activate   -> make the fake GApplication's Activate reply fail
-//   fail_activate_action -> make ActivateAction reply fail
 //
 // Like Authenticator 4.6.2, GetResultMetas ignores the `locked` flag: that
 // asymmetry is exactly what the extension has to defend against.
@@ -25,9 +23,6 @@ import GLib from 'gi://GLib';
 const DIR = GLib.getenv('OTP_FAKE_DIR') || '/tmp/otp-fake';
 const BUS_NAME = 'com.belmoussaoui.Authenticator.SearchProvider';
 const OBJ_PATH = '/com/belmoussaoui/Authenticator/SearchProvider';
-// The app's own bus name, to observe the gear's Activate/ActivateAction pair.
-const APP_BUS_NAME = 'com.belmoussaoui.Authenticator';
-const APP_OBJ_PATH = '/com/belmoussaoui/Authenticator';
 
 const XML = `<node>
   <interface name="org.gnome.Shell.SearchProvider2">
@@ -96,19 +91,6 @@ function resultIds() {
         .filter(line => line.length > 0);
 }
 
-function appendAppCall(line) {
-    const path = GLib.build_filenamev([DIR, 'app_calls.log']);
-    let existing = '';
-    try {
-        const [ok, bytes] = GLib.file_get_contents(path);
-        if (ok)
-            existing = new TextDecoder().decode(bytes);
-    } catch {
-        // No previous log file.
-    }
-    GLib.file_set_contents(path, `${existing}${line}\n`);
-}
-
 function resultMetas(requested) {
     const string = GLib.Variant.new_string;
     const code = readText('code', '111111');
@@ -162,51 +144,6 @@ Gio.DBus.session.register_object(
 
 Gio.bus_own_name_on_connection(
     Gio.DBus.session, BUS_NAME, Gio.BusNameOwnerFlags.NONE, null, null);
-
-const APP_XML = `<node>
-  <interface name="org.freedesktop.Application">
-    <method name="Activate">
-      <arg type="a{sv}" name="platform_data" direction="in"/>
-    </method>
-    <method name="ActivateAction">
-      <arg type="s" name="action_name" direction="in"/>
-      <arg type="av" name="parameter" direction="in"/>
-      <arg type="a{sv}" name="platform_data" direction="in"/>
-    </method>
-    <method name="Open">
-      <arg type="as" name="uris" direction="in"/>
-      <arg type="a{sv}" name="platform_data" direction="in"/>
-    </method>
-  </interface>
-</node>`;
-
-const appIfaceInfo =
-    Gio.DBusNodeInfo.new_for_xml(APP_XML).interfaces[0];
-Gio.DBus.session.register_object(
-    APP_OBJ_PATH, appIfaceInfo,
-    (conn, sender, path, iface, method, params, invocation) => {
-        // Log the attempt even when it is made to fail, so the test can see the
-        // order regardless of the outcome.
-        if (method === 'ActivateAction')
-            appendAppCall(`ActivateAction:${params.recursiveUnpack()[0]}`);
-        else
-            appendAppCall(method);
-
-        if (method === 'Activate' && exists('fail_activate')) {
-            invocation.return_dbus_error(
-                'org.freedesktop.DBus.Error.Failed', 'Activate failed (test)');
-            return;
-        }
-        if (method === 'ActivateAction' && exists('fail_activate_action')) {
-            invocation.return_dbus_error(
-                'org.freedesktop.DBus.Error.Failed', 'ActivateAction failed (test)');
-            return;
-        }
-        invocation.return_value(null);
-    },
-    null, null);
-Gio.bus_own_name_on_connection(
-    Gio.DBus.session, APP_BUS_NAME, Gio.BusNameOwnerFlags.NONE, null, null);
 
 print('fake provider ready');
 GLib.MainLoop.new(null, false).run();

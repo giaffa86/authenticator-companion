@@ -90,19 +90,16 @@ No global D-Bus filter is installed (`Gio.DBus.session.add_filter()` is
 forbidden: it crashes GNOME Shell 50 devkit sessions) and notifications are not
 intercepted.
 
-The gear icon next to the search field does not touch the Search Provider:
-it first activates Authenticator's own GApplication over D-Bus
-(`org.freedesktop.Application.Activate` on the `com.belmoussaoui.Authenticator`
-bus name) so the main window exists, then activates the `preferences` action
-(`org.freedesktop.Application.ActivateAction`). The intermediate `Activate` is
-required because the app's `preferences` handler dereferences the main window
-and crashes when the app was started as a D-Bus service without one. It falls
-back to launching the app when either call is unavailable.
+The button next to the search field does not touch the Search Provider: it
+brings Authenticator's own window to the front by activating the app through
+`Shell.AppSystem` / `Shell.App.activate()`, the same path as the
+**Open Authenticator** entry. It does not read or write any account data, and
+it is a no-op when Authenticator is not installed.
 
 ## Installation
 
 ```sh
-# from this repository (installs exactly the three shipped files)
+# from this repository (installs the shipped files and compiles the UI schema)
 ./scripts/sync-extension.sh
 # or, for a packed bundle:
 gnome-extensions install authenticator-companion@giaffa86.shell-extension.zip
@@ -134,27 +131,73 @@ rm -rf ~/.local/share/gnome-shell/extensions/otp-panel@giaffa86
 ## Usage
 
 - Click the key icon in the top panel.
-- The popup lists every account; codes are masked (`••••••`) until requested.
+- The popup lists every account; a hidden account shows no code line at all.
 - Use the eye button to reveal the current code; it is re-fetched every second
   while it is shown, so it stays current across a code rollover.
+- A shown code has a thin countdown bar under it: the accent fill empties over
+  the TOTP period and turns red in its last 5 seconds. The standard 30 s period
+  is assumed; the bar follows the account's real period once two observed code
+  changes have measured it, and is anchored to the latest observed change so
+  the polling slack in the measurement cannot skew it. The bar stays under the
+  "Copied to clipboard" confirmation too, for the code that was just copied,
+  and it stops at zero once that code expires instead of refilling.
+  Copying again updates the bar for the newly copied code, including across a
+  rollover.
+- Revealing a code and the "Copied to clipboard" confirmation both fade and
+  slide their line into place instead of popping; the confirmation stays for
+  four seconds.
 - Click an account row to copy the current code to the clipboard.
-- Type in the search field to filter by account or service name.
-- The gear icon next to the search field opens Authenticator's settings (it is
-  shown only while the app is unlocked; it falls back to opening the app when
-  the app is unreachable).
+- Type in the search field to filter by account or service name. Opening the
+  popup puts the caret in the field automatically (this can be turned off in the
+  preferences).
+- Press the popup shortcut (default **Super+Shift+A**) to open or close the popup
+  without reaching for the panel.
+- The open-app button next to the search field brings Authenticator's window
+  to the front (it is shown only while the app is unlocked; the same action is
+  offered as an **Open Authenticator** entry when the app is unavailable).
 - If Authenticator is locked or has no accounts, the popup says so and offers an
   **Open Authenticator** entry.
 - If Authenticator is **not installed at all**, the extension still loads and the
   panel icon appears, but the popup reports that it is not installed and shows no
   open-app entry. It stays inert until the app is available.
 
+## Preferences
+
+The extension ships a preferences window (`prefs.js` + a GSettings schema) for
+presentation and workflow only. It never stores accounts or codes.
+
+- **Behaviour** — focus the search field on open; close the popup after copying
+  a code.
+- **Appearance** — pick the top-panel icon; sort accounts (as returned by
+  Authenticator, by account name, by provider name); show/hide the provider
+  name; row density (comfortable or compact); which fields the search matches
+  (name and provider, name only, provider only); group the revealed code in
+  blocks of three digits; show/hide the validity countdown bar; number of
+  account rows the list shows without scrolling; show/hide the open-app button
+  and pick its icon.
+- **Shortcuts** — the accelerator that opens or closes the popup, and a second
+  one that brings Authenticator's window to the front.
+
+Open it from GNOME Extensions (the gear next to *Authenticator Companion*) or:
+
+```sh
+gnome-extensions prefs authenticator-companion@giaffa86
+```
+
+Changing a preference while the popup is open applies immediately: the popup
+rebuilds its rows from the provider reply (names and the current code are
+re-fetched, never cached from GSettings).
+
 ## Security and privacy model
 
 - **Single source of truth.** Accounts and codes come only from Authenticator's
   Search Provider D-Bus API. The extension does not read the keyring, the
   app's database, or Flatpak permissions.
-- **No persistence.** Codes are never written to GSettings, files, logs,
-  notifications or a database. `metadata.json` declares no settings schema.
+- **Preferences are UI-only.** The GSettings schema carries sorting,
+  appearance, behaviour and the popup shortcut, and nothing else: never
+  accounts, account identifiers, provider names or codes, and never the search
+  text. Codes are never written to GSettings, files, logs, notifications or a
+  database.
 - **Minimal in-memory lifetime.** Codes are kept in memory only while the popup
   is open and only for rows that are revealed. Closing the popup, locking the
   app, or rebuilding the account list clears them, and a copied code is dropped

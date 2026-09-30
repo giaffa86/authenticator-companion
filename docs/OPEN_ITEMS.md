@@ -113,7 +113,7 @@ extension code path.
 
 - After login the extension was listed and `gnome-extensions info` reported
   `Enabled: Yes`, `State: ACTIVE`; the panel button was present.
-- `./scripts/sync-extension.sh` then installed the final three files (hashes
+- `./scripts/sync-extension.sh` then installed the shipped files (hashes
   equal to the working tree) and reloaded the extension: it returned to
   `ACTIVE` with no `[authenticator-companion]` or JS error in the journal after
   the reload.

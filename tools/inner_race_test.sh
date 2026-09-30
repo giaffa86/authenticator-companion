@@ -10,7 +10,7 @@
 #   F. older delayed reveal followed by a fast copy        (H03)
 #   G. disable() during delayed reveal/copy, then enable()  (H05)
 #   I. malformed metadata is visible, logged once, recovers (U01)
-#   J. gear: Activate -> ActivateAction, menu close, fallbacks (T01/T06/U08)
+#   J. open-app shortcut: activates the app, closes the popup (T01/U08)
 #
 # Clipboard writes are recorded by patching St.Clipboard.set_text, so a code
 # reaching the clipboard is visible without touching a real clipboard.
@@ -261,55 +261,23 @@ else
     FAIL=$((FAIL + 1))
 fi
 
-# --- J. the gear: happy path, menu close, both fallbacks (T01/T06/U08) -----
+# --- J. the open-app shortcut: activates the app, closes the popup (T01/U08) --
 clear_delay
-rm -f "$FAKE/fail_activate" "$FAKE/fail_activate_action"
-# Make the launch fallback observable: return a fake Shell.App whose activate()
-# is recorded, without needing a real .desktop entry in the nested shell.
+# Make the activation observable: return a fake Shell.App whose activate() is
+# recorded, without needing a real .desktop entry in the nested shell.
 ev "(() => {
     globalThis.__otpLaunchCalls = [];
     globalThis.__otpExt._lookupApp = () => ({ activate: () => globalThis.__otpLaunchCalls.push('activate') });
     return 'ok';
 })()" >/dev/null
 
-# J1. happy path: Activate then preferences; popup closes; no launch fallback.
 open_menu
 wait_rows 1 >/dev/null
-rm -f "$FAKE/app_calls.log"
 ev "globalThis.__otpLaunchCalls = []; 'ok'" >/dev/null
-ev "const b = globalThis.__otpExt._settingsButton; b.emit('clicked', b); 'ok'" >/dev/null
-sleep 1.5
-calls=$(cat "$FAKE/app_calls.log" 2>/dev/null || true)
-check "J gear sends Activate first" "Activate" "$(printf '%s' "$calls" | sed -n '1p')"
-check "J gear activates preferences" "ActivateAction:preferences" "$(printf '%s' "$calls" | sed -n '2p')"
-check "J gear closes the popup" "False" "$(snap | field menuOpen)"
-check "J happy path does not launch" "0" "$(snap | field launches)"
-
-# J2. ActivateAction fails: fall back to launching the app.
-: > "$FAKE/fail_activate_action"
-open_menu
-wait_rows 1 >/dev/null
-rm -f "$FAKE/app_calls.log"
-ev "globalThis.__otpLaunchCalls = []; 'ok'" >/dev/null
-ev "const b = globalThis.__otpExt._settingsButton; b.emit('clicked', b); 'ok'" >/dev/null
-sleep 1.0
-calls=$(cat "$FAKE/app_calls.log" 2>/dev/null || true)
-check "J2 ActivateAction failure falls back to launch" "1" "$(snap | field launches)"
-check "J2 still sent ActivateAction" "ActivateAction:preferences" "$(printf '%s' "$calls" | sed -n '2p')"
-rm -f "$FAKE/fail_activate_action"
-
-# J3. Activate fails: fall back to launching, without trying preferences.
-: > "$FAKE/fail_activate"
-open_menu
-wait_rows 1 >/dev/null
-rm -f "$FAKE/app_calls.log"
-ev "globalThis.__otpLaunchCalls = []; 'ok'" >/dev/null
-ev "const b = globalThis.__otpExt._settingsButton; b.emit('clicked', b); 'ok'" >/dev/null
-sleep 1.0
-calls=$(cat "$FAKE/app_calls.log" 2>/dev/null || true)
-check "J3 Activate failure falls back to launch" "1" "$(snap | field launches)"
-check "J3 no preferences after failed Activate" "" "$(printf '%s' "$calls" | sed -n '2p')"
-rm -f "$FAKE/fail_activate"
+ev "const b = globalThis.__otpExt._appButton; b.emit('clicked', b); 'ok'" >/dev/null
+sleep 0.5
+check "J open-app shortcut activates the app" "1" "$(snap | field launches)"
+check "J open-app shortcut closes the popup" "False" "$(snap | field menuOpen)"
 
 # --- report -----------------------------------------------------------------
 printf '%s\n' "${RESULTS[@]}"

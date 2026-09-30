@@ -20,6 +20,9 @@ __pycache__/
 # Generated extension bundles
 *.shell-extension.zip
 
+# Generated GSettings schema binary (glib-compile-schemas)
+**/gschemas.compiled
+
 # Logs and temporary files
 *.log
 *.tmp

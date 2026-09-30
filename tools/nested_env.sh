@@ -12,9 +12,11 @@ INNER="$1"
 RUNTIME=$(mktemp -d /tmp/otp-rt-XXXXXX); chmod 700 "$RUNTIME"
 DATA=$(mktemp -d /tmp/otp-data-XXXXXX)
 CFG=$(mktemp -d /tmp/otp-cfg-XXXXXX)
-mkdir -p "$DATA/gnome-shell/extensions/$EXT_UUID" "$DATA/gnome-shell/extensions/authenticator-companion-test-unsafe@giaffa86"
-cp "$SRC/metadata.json" "$SRC/extension.js" "$SRC/stylesheet.css" \
+mkdir -p "$DATA/gnome-shell/extensions/$EXT_UUID" "$DATA/gnome-shell/extensions/authenticator-companion-test-unsafe@giaffa86" "$DATA/glib-2.0/schemas"
+cp "$SRC/metadata.json" "$SRC/extension.js" "$SRC/prefs.js" "$SRC/stylesheet.css" \
    "$DATA/gnome-shell/extensions/$EXT_UUID/"
+cp "$SRC/schemas/"*.gschema.xml "$DATA/glib-2.0/schemas/"
+glib-compile-schemas "$DATA/glib-2.0/schemas/"
 cp "$SRC/tools/unsafe_helper/metadata.json" "$SRC/tools/unsafe_helper/extension.js" \
    "$DATA/gnome-shell/extensions/authenticator-companion-test-unsafe@giaffa86/"
 
@@ -45,7 +47,7 @@ timeout "${OTP_TIMEOUT:-100}" dbus-run-session -- bash -c '
   else
     PROXY=0
   fi
-  gnome-shell --headless --debug-control >"$OTP_RUNTIME/shell.log" 2>&1 &
+  gnome-shell --headless --virtual-monitor 1280x720 --debug-control >"$OTP_RUNTIME/shell.log" 2>&1 &
   SHELL=$!
   for i in $(seq 1 25); do
     sleep 1

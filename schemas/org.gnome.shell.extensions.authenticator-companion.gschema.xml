@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.authenticator-companion" path="/org/gnome/shell/extensions/authenticator-companion/">
+    <key name="panel-icon" type="s">
+      <choices>
+        <choice value="dialog-password-symbolic"/>
+        <choice value="channel-secure-symbolic"/>
+        <choice value="changes-prevent-symbolic"/>
+        <choice value="auth-smartcard-symbolic"/>
+      </choices>
+      <default>"dialog-password-symbolic"</default>
+      <description>Icon shown in the top panel</description>
+    </key>
+
+    <key name="sort-by" type="s">
+      <choices>
+        <choice value="default"/>
+        <choice value="name"/>
+        <choice value="provider"/>
+      </choices>
+      <default>"default"</default>
+      <description>Order of the account rows</description>
+    </key>
+
+    <key name="show-provider-name" type="b">
+      <default>true</default>
+      <description>Show the provider name under each account</description>
+    </key>
+
+    <key name="row-density" type="s">
+      <choices>
+        <choice value="comfortable"/>
+        <choice value="compact"/>
+      </choices>
+      <default>"comfortable"</default>
+      <description>Vertical density of the account rows</description>
+    </key>
+
+    <key name="search-fields" type="s">
+      <choices>
+        <choice value="both"/>
+        <choice value="name"/>
+        <choice value="provider"/>
+      </choices>
+      <default>"both"</default>
+      <description>Fields matched by the search field</description>
+    </key>
+
+    <key name="code-grouping" type="b">
+      <default>false</default>
+      <description>Group the revealed code in blocks of three digits</description>
+    </key>
+
+    <key name="show-countdown-bar" type="b">
+      <default>true</default>
+      <description>Show the remaining-validity bar under a revealed code</description>
+    </key>
+
+    <key name="popup-rows" type="i">
+      <range min="3" max="12"/>
+      <default>6</default>
+      <description>Number of account rows the list shows without scrolling</description>
+    </key>
+
+    <key name="show-open-app-button" type="b">
+      <default>true</default>
+      <description>Show the open-app button next to the search field</description>
+    </key>
+
+    <key name="open-app-icon" type="s">
+      <choices>
+        <choice value="go-next-symbolic"/>
+        <choice value="window-new-symbolic"/>
+        <choice value="external-link-symbolic"/>
+        <choice value="application-x-executable-symbolic"/>
+      </choices>
+      <default>"go-next-symbolic"</default>
+      <description>Icon of the open-app button</description>
+    </key>
+
+    <key name="focus-search-on-open" type="b">
+      <default>true</default>
+      <description>Put the caret in the search field when the popup opens</description>
+    </key>
+
+    <key name="close-after-copy" type="b">
+      <default>false</default>
+      <description>Close the popup after copying a code</description>
+    </key>
+
+    <key name="open-dialog-shortcut" type="as">
+      <default>["&lt;Super&gt;&lt;Shift&gt;a"]</default>
+      <description>Keyboard shortcut used to open or close the popup</description>
+    </key>
+
+    <key name="open-app-shortcut" type="as">
+      <default>["&lt;Super&gt;&lt;Shift&gt;o"]</default>
+      <description>Keyboard shortcut used to bring Authenticator to the front</description>
+    </key>
+  </schema>
+</schemalist>

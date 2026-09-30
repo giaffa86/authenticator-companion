@@ -1,27 +1,143 @@
-/* Authenticator Companion — minimal styling */
+/* Authenticator Companion — styling aligned with Containers Manager:
+   translucent Shell surfaces, system accent for state, pill controls. */
 
 .authenticator-companion-scrollview {
-    max-height: 24em;
+    /* Fixed box: the popup keeps its size while the account list is filtered.
+       The height is overridden from the popup-rows preference. */
+    height: 24em;
+    width: 20em;
 }
 
+/* St.ScrollView draws its scrollbar on top of the child, so the list keeps a
+   right gutter the width of that bar: cards end before it instead of being
+   cut by it. */
+.authenticator-companion-list {
+    padding-right: 10px;
+}
+
+/* Search: one pill row holding the entry and the open-app shortcut. */
 .authenticator-companion-search-item {
-    padding: 4px 6px;
+    padding: 0 0 6px 0;
+}
+
+.authenticator-companion-search-row {
+    spacing: 4px;
+    padding: 3px 4px 3px 10px;
+    min-height: 34px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.96);
+}
+
+.authenticator-companion-search-row:hover {
+    background-color: rgba(255, 255, 255, 0.075);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.authenticator-companion-search-row.focused {
+    border-color: -st-accent-color;
+    box-shadow: inset 0 0 0 1px rgba(119, 168, 232, 0.58);
+}
+
+.authenticator-companion-search-entry {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0;
+    font-size: 10.5pt;
+    font-weight: 500;
+    color: inherit;
+    caret-color: -st-accent-color;
+    selection-background-color: -st-accent-color;
+}
+
+.authenticator-companion-search-entry:hover,
+.authenticator-companion-search-entry:focus {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.authenticator-companion-search-entry StLabel.hint-text {
+    color: rgba(255, 255, 255, 0.70);
+}
+
+/* Round open-app shortcut inside the search row. */
+.authenticator-companion-open-app {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    max-width: 34px;
+    max-height: 34px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background-color: transparent;
+    padding: 0;
+    color: inherit;
+}
+
+.authenticator-companion-open-app:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+.authenticator-companion-open-app:focus {
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: -st-accent-color;
+    box-shadow: inset 0 0 0 1px rgba(119, 168, 232, 0.58);
+}
+
+.authenticator-companion-open-app:active {
+    background-color: rgba(255, 255, 255, 0.22);
+}
+
+/* Account rows: each row is a card with a compact text hierarchy. */
+.authenticator-companion-item {
+    padding: 6px 10px;
+    margin: 2px 0;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background-color: rgba(255, 255, 255, 0.045);
+    color: rgba(255, 255, 255, 0.96);
+    box-shadow: none;
+}
+
+.authenticator-companion-item:hover,
+.authenticator-companion-item:selected {
+    background-color: rgba(255, 255, 255, 0.075);
+}
+
+.authenticator-companion-item:active,
+.authenticator-companion-item:active:hover {
+    background-color: rgba(255, 255, 255, 0.09);
+}
+
+.authenticator-companion-item:focus,
+.authenticator-companion-item:active:focus {
+    border-color: -st-accent-color;
+    box-shadow: inset 0 0 0 1px rgba(119, 168, 232, 0.45);
 }
 
 .authenticator-companion-title {
-    font-weight: bold;
+    font-size: 10pt;
+    font-weight: 700;
 }
 
 .authenticator-companion-subtitle {
-    font-size: 0.85em;
-    opacity: 0.7;
+    font-size: 8.5pt;
+    font-weight: 500;
+    opacity: 0.62;
 }
 
 .authenticator-companion-code {
     font-family: monospace;
+    font-size: 8.5pt;
     letter-spacing: 0.15em;
     margin-top: 2px;
-    opacity: 0.6;
+    opacity: 0.62;
 }
 
 .authenticator-companion-code-visible {
@@ -29,18 +145,99 @@
     letter-spacing: 0.1em;
 }
 
+/* Countdown of the shown code's remaining validity, under the code. */
+.authenticator-companion-countdown-track {
+    height: 3px;
+    min-height: 3px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.14);
+    margin-top: 5px;
+}
+
+.authenticator-companion-countdown-fill {
+    height: 3px;
+    min-height: 3px;
+    border-radius: 999px;
+    background-color: -st-accent-color;
+}
+
+.authenticator-companion-countdown-fill.warning {
+    background-color: #e01b24;
+}
+
+/* Round reveal toggle: accent blue only while a code is shown. */
+.authenticator-companion-reveal {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    max-width: 34px;
+    max-height: 34px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background-color: transparent;
+    padding: 0;
+    color: inherit;
+}
+
+.authenticator-companion-reveal:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.authenticator-companion-reveal:focus {
+    background-color: rgba(255, 255, 255, 0.16);
+    border-color: -st-accent-color;
+    box-shadow: inset 0 0 0 1px rgba(119, 168, 232, 0.58);
+}
+
+.authenticator-companion-reveal:active {
+    background-color: rgba(255, 255, 255, 0.22);
+}
+
+.authenticator-companion-reveal:checked {
+    background-color: -st-accent-color;
+    color: -st-accent-fg-color;
+}
+
+.authenticator-companion-reveal:checked:hover {
+    background-color: -st-accent-color;
+}
+
+.authenticator-companion-reveal:checked:focus {
+    border-color: rgba(255, 255, 255, 0.72);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
 .authenticator-companion-status {
+    font-size: 9pt;
     opacity: 0.75;
     max-width: 24em;
 }
 
-.authenticator-companion-reveal {
-    padding: 2px;
-    border-radius: 6px;
+/* Compact density: shorter rows and a smaller reveal target, for users who
+   keep many accounts and prefer to see more of them at once. */
+.authenticator-companion-item.compact {
+    padding: 3px 8px;
+    margin: 1px 0;
 }
 
-.authenticator-companion-settings {
-    padding: 2px 4px;
-    border-radius: 6px;
-    margin-left: 4px;
+.authenticator-companion-item.compact .authenticator-companion-title {
+    font-size: 9pt;
+}
+
+.authenticator-companion-item.compact .authenticator-companion-subtitle {
+    font-size: 8pt;
+}
+
+.authenticator-companion-item.compact .authenticator-companion-countdown-track {
+    margin-top: 3px;
+}
+
+.authenticator-companion-item.compact .authenticator-companion-reveal {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+    max-width: 28px;
+    max-height: 28px;
 }

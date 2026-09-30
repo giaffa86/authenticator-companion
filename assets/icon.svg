@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" role="img" aria-labelledby="title">
+  <title id="title">Authenticator Companion</title>
+  <defs>
+    <linearGradient id="blue" x1="409" y1="1031" x2="955" y2="285" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0875ed"/>
+      <stop offset="1" stop-color="#1978f7"/>
+    </linearGradient>
+    <mask id="ring-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1254" height="1254">
+      <rect width="1254" height="1254" fill="white"/>
+      <rect x="394" y="672" width="466" height="582" rx="76" fill="black"/>
+      <rect y="934" width="1254" height="320" fill="black"/>
+    </mask>
+    <mask id="keyhole-mask" maskUnits="userSpaceOnUse" x="409" y="680" width="436" height="352">
+      <rect x="409" y="680" width="436" height="352" fill="white"/>
+      <path d="M602 860 A51 51 0 1 1 652 860 L670 939 Q672 946 664 946 H590 Q582 946 584 939 Z" fill="black"/>
+    </mask>
+  </defs>
+  <g mask="url(#ring-mask)" fill="none">
+    <circle cx="627" cy="613" r="384" stroke="#d7dbe4" stroke-width="62"/>
+    <path d="M627 326 A286 286 0 0 1 819 824" stroke="url(#blue)" stroke-width="80" stroke-linecap="round"/>
+  </g>
+  <g fill="none" stroke="#94a0b7" stroke-width="36" stroke-linecap="round">
+    <path d="M330 612 H368"/>
+    <path d="M372 455 L405 475"/>
+    <path d="M495 344 L511 376"/>
+  </g>
+  <path d="M510 695 V625 A117 117 0 0 1 744 625 V695" fill="none" stroke="url(#blue)" stroke-width="62"/>
+  <rect x="409" y="680" width="436" height="352" rx="62" fill="url(#blue)" mask="url(#keyhole-mask)"/>
+</svg>
