@@ -37,7 +37,7 @@ check() {
 
 snap() {
     jseval "(() => {
-        const ext = Main.extensionManager.lookup('$UUID').stateObj;
+        const ext = Main.extensionManager.lookup('$UUID').stateObj._popup;
         const row = ext._rows[0];
         return {
             rows: ext._rows.length,
@@ -61,16 +61,16 @@ snap() {
 }
 
 setbool() {
-    jseval "Main.extensionManager.lookup('$UUID').stateObj._settings.set_boolean('$1', $2); 'ok'" >/dev/null
+    jseval "Main.extensionManager.lookup('$UUID').stateObj._popup._settings.set_boolean('$1', $2); 'ok'" >/dev/null
 }
 setstr() {
-    jseval "Main.extensionManager.lookup('$UUID').stateObj._settings.set_string('$1', '$2'); 'ok'" >/dev/null
+    jseval "Main.extensionManager.lookup('$UUID').stateObj._popup._settings.set_string('$1', '$2'); 'ok'" >/dev/null
 }
 setint() {
-    jseval "Main.extensionManager.lookup('$UUID').stateObj._settings.set_int('$1', $2); 'ok'" >/dev/null
+    jseval "Main.extensionManager.lookup('$UUID').stateObj._popup._settings.set_int('$1', $2); 'ok'" >/dev/null
 }
 setstrv() {
-    jseval "const s=Main.extensionManager.lookup('$UUID').stateObj._settings; s.set_strv('$1', ['$2']); 'ok'" >/dev/null
+    jseval "const s=Main.extensionManager.lookup('$UUID').stateObj._popup._settings; s.set_strv('$1', ['$2']); 'ok'" >/dev/null
 }
 
 # Three accounts, deliberately out of name order, so sorting is observable.
@@ -80,10 +80,10 @@ printf '123456' > "$FAKE/code"
 rm -f "$FAKE/locked" "$FAKE/delay_ms" "$FAKE/delay_first_ms" "$FAKE/omit_name"
 
 open_menu() {
-    ev "Main.extensionManager.lookup('$UUID').stateObj._button.menu.open(); 'ok'" >/dev/null
+    ev "Main.extensionManager.lookup('$UUID').stateObj._popup._button.menu.open(); 'ok'" >/dev/null
 }
 close_menu() {
-    ev "Main.extensionManager.lookup('$UUID').stateObj._button.menu.close(); 'ok'" >/dev/null
+    ev "Main.extensionManager.lookup('$UUID').stateObj._popup._button.menu.close(); 'ok'" >/dev/null
 }
 
 open_menu
@@ -137,7 +137,7 @@ setstr "row-density" "comfortable"
 
 # 3c. search-fields limits which field the search matches. "Provider" only
 # appears in the provider description ("Fake Provider"), never in the name.
-ev "const e=Main.extensionManager.lookup('$UUID').stateObj; e._entry.set_text('Provider'); 'ok'" >/dev/null
+ev "const e=Main.extensionManager.lookup('$UUID').stateObj._popup; e._entry.set_text('Provider'); 'ok'" >/dev/null
 sleep 0.5
 both=$(snap)
 check "search matches the provider by default" "3" "$(echo "$both" | get visibleRows)"
@@ -156,13 +156,13 @@ for _ in $(seq 1 20); do
 done
 check "search-fields=provider matches the provider" "3" "$(echo "$provonly" | get visibleRows)"
 setstr "search-fields" "both"
-ev "const e=Main.extensionManager.lookup('$UUID').stateObj; e._entry.set_text(''); 'ok'" >/dev/null
+ev "const e=Main.extensionManager.lookup('$UUID').stateObj._popup; e._entry.set_text(''); 'ok'" >/dev/null
 sleep 0.5
 
 # 4. code-grouping groups the revealed digits.
 setbool "code-grouping" "true"
 sleep 0.5
-ev "const e=Main.extensionManager.lookup('$UUID').stateObj; e._reveal(e._rows[0]); 'ok'" >/dev/null
+ev "const e=Main.extensionManager.lookup('$UUID').stateObj._popup; e._reveal(e._rows[0]); 'ok'" >/dev/null
 grouped=""
 for _ in $(seq 1 20); do
     grouped=$(snap)
@@ -174,7 +174,7 @@ check "code-grouping groups the revealed code" "123 456" "$(echo "$grouped" | ge
 # 5. show-countdown-bar = false hides the validity bar.
 setbool "show-countdown-bar" "false"
 sleep 0.5
-ev "const e=Main.extensionManager.lookup('$UUID').stateObj; e._reveal(e._rows[0]); 'ok'" >/dev/null
+ev "const e=Main.extensionManager.lookup('$UUID').stateObj._popup; e._reveal(e._rows[0]); 'ok'" >/dev/null
 sleep 1
 check "show-countdown-bar=false hides the bar" "0" "$(snap | get countdownVisible)"
 setbool "show-countdown-bar" "true"
@@ -228,7 +228,7 @@ check "focus-search-on-open=true focuses the search" "1" "$(echo "$focused" | ge
 # 10. close-after-copy closes the popup on activation.
 setbool "close-after-copy" "true"
 sleep 0.5
-ev "const e=Main.extensionManager.lookup('$UUID').stateObj; e._copy(e._rows[0]); 'ok'" >/dev/null
+ev "const e=Main.extensionManager.lookup('$UUID').stateObj._popup; e._copy(e._rows[0]); 'ok'" >/dev/null
 closed=""
 for _ in $(seq 1 20); do
     closed=$(snap)

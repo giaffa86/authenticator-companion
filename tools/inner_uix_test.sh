@@ -35,7 +35,7 @@ check() {
 snap() {
     jseval "(() => {
         const St = imports.gi.St;
-        const ext = Main.extensionManager.lookup('$UUID').stateObj;
+        const ext = Main.extensionManager.lookup('$UUID').stateObj._popup;
         const row = ext._rows[0];
         const node = a => a ? a.get_theme_node() : null;
         const radius = a => node(a) ? node(a).get_border_radius(St.Corner.TOPLEFT) : -1;
@@ -91,10 +91,10 @@ snap() {
 }
 
 open_menu() {
-    ev "Main.extensionManager.lookup('$UUID').stateObj._button.menu.open(); 'ok'" >/dev/null
+    ev "Main.extensionManager.lookup('$UUID').stateObj._popup._button.menu.open(); 'ok'" >/dev/null
 }
 close_menu() {
-    ev "Main.extensionManager.lookup('$UUID').stateObj._button.menu.close(); 'ok'" >/dev/null
+    ev "Main.extensionManager.lookup('$UUID').stateObj._popup._button.menu.close(); 'ok'" >/dev/null
 }
 
 open_menu
@@ -125,7 +125,7 @@ check "reveal button is a round ~34px target" "yes" "$([ "$(echo "$state" | get 
 # Freeze validity at 50% and stop polling: the first actual rendered frame
 # must use the newly allocated track width without waiting for a refresh.
 firstframe=$(jseval "(() => {
-    const ext = Main.extensionManager.lookup('$UUID').stateObj;
+    const ext = Main.extensionManager.lookup('$UUID').stateObj._popup;
     imports.gi.GLib.source_remove(ext._refreshId);
     ext._refreshId = 0;
     const row = ext._rows[0];
@@ -139,7 +139,7 @@ sleep 0.3
 allocated=$(snap)
 check "first rendered countdown matches the allocated track" "yes" \
     "$(echo "$allocated" | python3 -c 'import json,sys; s=json.load(sys.stdin); t=s["countdownTrackWidth"]; print("yes" if t > 0 and abs(s["countdownFillWidth"] - t / 2) <= 1 else "no")')"
-ev "Main.extensionManager.lookup('$UUID').stateObj._rows[0].updateCountdown(); 'ok'" >/dev/null
+ev "Main.extensionManager.lookup('$UUID').stateObj._popup._rows[0].updateCountdown(); 'ok'" >/dev/null
 sleep 1.2
 aftertick=$(snap)
 check "first countdown tick does not change the layout" "$(echo "$allocated" | get countdownTrackWidth)" "$(echo "$aftertick" | get countdownTrackWidth)"
@@ -156,7 +156,7 @@ check "search is focused on open" "1" "$(echo "$focused" | get entryFocused)"
 check "focused search row shows the focus class" "yes" "$(echo "$focused" | get searchClass | grep -q focused && echo yes || echo no)"
 
 # Reveal through the real path so the code (and its countdown) populates.
-ev "const e=Main.extensionManager.lookup('$UUID').stateObj; e._reveal(e._rows[0]); 'ok'" >/dev/null
+ev "const e=Main.extensionManager.lookup('$UUID').stateObj._popup; e._reveal(e._rows[0]); 'ok'" >/dev/null
 checked=""
 for _ in $(seq 1 20); do
     checked=$(snap)
@@ -170,7 +170,7 @@ flw=$(echo "$checked" | get countdownFillWidth)
 check "countdown fill tracks the track width" "yes" "$([ "$flw" -gt 0 ] && [ "$flw" -le "$tkw" ] && echo yes || echo no)"
 
 warning=$(jseval "(() => {
-    const row = Main.extensionManager.lookup('$UUID').stateObj._rows[0];
+    const row = Main.extensionManager.lookup('$UUID').stateObj._popup._rows[0];
     const fill = row._countdownFill;
     const realNow = Date.now;
     Date.now = () => 29999000;
@@ -186,7 +186,7 @@ check "countdown switches to the warning colour" "224,27,36" "$(echo "$warning" 
 
 # Copying replaces the code with a confirmation: the row drops the code, but
 # the expiry bar must stay for the code that was just copied.
-ev "const e=Main.extensionManager.lookup('$UUID').stateObj; e._copy(e._rows[0]); 'ok'" >/dev/null
+ev "const e=Main.extensionManager.lookup('$UUID').stateObj._popup; e._copy(e._rows[0]); 'ok'" >/dev/null
 sleep 0.6
 copied=$(snap)
 check "copy shows the confirmation" "Copied to clipboard" "$(echo "$copied" | get codeLabelText)"
@@ -210,7 +210,7 @@ check "confirmation animates the code line out" "0" "$(echo "$reset" | get codeL
 # changes. A 60 s account seen one second late must not be re-phased from
 # `epoch % 59 s`; the bar is anchored to the observed change instead.
 period=$(jseval "(() => {
-    const row = Main.extensionManager.lookup('$UUID').stateObj._rows[0];
+    const row = Main.extensionManager.lookup('$UUID').stateObj._popup._rows[0];
     const realNow = Date.now;
     Date.now = () => 1000000;
     row.forgetCode();
@@ -232,7 +232,7 @@ check "countdown is anchored to the observed change" "58900" "$(echo "$period" |
 # A copied code that expires while the confirmation is still shown must keep
 # the bar at zero instead of refilling at the rollover.
 expired=$(jseval "(() => {
-    const row = Main.extensionManager.lookup('$UUID').stateObj._rows[0];
+    const row = Main.extensionManager.lookup('$UUID').stateObj._popup._rows[0];
     const realNow = Date.now;
     Date.now = () => 2000000;
     row.forgetCode();
@@ -254,7 +254,7 @@ check "copied bar stops at zero after expiry" "0" "$(echo "$expired" | get after
 
 # Copy again across a rollover while the previous confirmation is still shown.
 recopied=$(jseval "(() => {
-    const row = Main.extensionManager.lookup('$UUID').stateObj._rows[0];
+    const row = Main.extensionManager.lookup('$UUID').stateObj._popup._rows[0];
     const realNow = Date.now;
     try {
         row.clearCode();
@@ -278,7 +278,7 @@ check "recopy keeps no code in memory" "None" "$(echo "$recopied" | get code)"
 # Dropping the code must retain the timing anchor, including after the copy
 # confirmation clears. An inferred 59 s period must never use epoch modulo.
 anchoredCopy=$(jseval "(() => {
-    const row = Main.extensionManager.lookup('$UUID').stateObj._rows[0];
+    const row = Main.extensionManager.lookup('$UUID').stateObj._popup._rows[0];
     const realNow = Date.now;
     try {
         row.clearCode();

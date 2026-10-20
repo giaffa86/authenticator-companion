@@ -344,3 +344,50 @@ check the lock. A lock that completes between the final availability check and t
 clipboard/display update is therefore not revoked by the client. Closing that window
 completely requires a lock check inside Authenticator's `GetResultMetas`; it is
 tracked as OTP-006 in `docs/OPEN_ITEMS.md`.
+
+## 5. Review-guideline remediation (2026-10-20)
+
+Verified the modular runtime in nested GNOME Shell 50.6 with the deterministic
+fake provider. The entry point now creates/destroys `AuthenticatorPopup`;
+Shell-only modules live in `shell/`. Each component owns its cleanup. The test
+fixtures inspect `stateObj._popup`; lifecycle tests still call the extension's
+actual `enable()` and `disable()` methods.
+
+Corrections verified:
+
+- Popup destruction clears `_lastIds` as well as account rows and codes.
+- Refresh and tick use request identity instead of a shared busy boolean.
+  The new race case H holds two requests, completes the older request first,
+  and verifies that a third invocation remains blocked until the newer request
+  finishes. It exercises both refresh and tick.
+- Opening replaces the refresh timer beside its creation; closing also removes
+  the pending search-focus idle.
+- Development installation and nested test setup copy the runtime modules.
+- The nested harness now propagates test failures and timeouts instead of
+  returning the status of its final temporary-directory cleanup.
+
+| Check | Result |
+|---|---|
+| `inner_race_test.sh` | 28 passed, 0 failed; includes identifier cleanup and stale request ownership |
+| `inner_uix_test.sh` | 47 passed, 0 failed |
+| `inner_prefs_test.sh` | 26 passed, 0 failed |
+| `inner_large_list_test.sh` | 6 passed, 0 failed; 200 accounts |
+| Schema `glib-compile-schemas --strict --dry-run` | Passed |
+| Shell-script syntax and `git diff --check` | Passed |
+| Runtime JavaScript/CSS line length | No lines over 200 characters |
+| Packaged ZIP, Shexli | 0 errors, 0 warnings; one clipboard `manual_review` |
+
+All 107 runtime assertions passed. The malformed-provider scenario intentionally
+logs one extension error; the preferences and large-list runs reported no
+extension errors, and the UI run reported no stylesheet errors. Session service
+and compositor shutdown diagnostics are not extension failures.
+
+The ZIP contains `metadata.json`, `extension.js`, `prefs.js`, `stylesheet.css`,
+three `shell/*.js` modules and the schema XML; no test tools, documentation or
+compiled schema. The remaining clipboard finding is reviewed against the
+explicit clipboard declaration in `metadata.json`.
+
+These checks use isolated fake-provider sessions. The real-provider host check,
+host-session reload and logout/login were not repeated for this refactor.
+OTP-006 remains unchanged; see §4.1. The runtime checks and Shexli do not certify
+maintainer understanding or guarantee EGO approval.

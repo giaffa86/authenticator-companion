@@ -27,11 +27,11 @@ eval_shell() {
 }
 
 # org.gnome.Shell.Eval JSON-serializes the returned value. The extension's
-# implementation instance is `Main.extensionManager.lookup(uuid).stateObj`.
+# implementation instance is `Main.extensionManager.lookup(uuid).stateObj._popup`.
 snap() {
   local out
   out=$(eval_shell "(() => {
-    const ext = Main.extensionManager.lookup('$UUID')?.stateObj;
+    const ext = Main.extensionManager.lookup('$UUID')?.stateObj._popup;
     if (!ext || !ext._button) return {err: 'noext'};
     const rows = (ext._rows || []).map(r => ({
       id: r.accountId, name: r.accountName, revealed: !!r.revealed,
@@ -46,10 +46,10 @@ snap() {
   echo "$out" | sed -n "s/^(true, '\(.*\)')$/\1/p"
 }
 
-open_menu()  { eval_shell "Main.extensionManager.lookup('$UUID').stateObj._button.menu.open(); 'ok'"  >/dev/null; }
-close_menu() { eval_shell "Main.extensionManager.lookup('$UUID').stateObj._button.menu.close(); 'ok'" >/dev/null; }
+open_menu()  { eval_shell "Main.extensionManager.lookup('$UUID').stateObj._popup._button.menu.open(); 'ok'"  >/dev/null; }
+close_menu() { eval_shell "Main.extensionManager.lookup('$UUID').stateObj._popup._button.menu.close(); 'ok'" >/dev/null; }
 reveal_first() {
-  eval_shell "const e = Main.extensionManager.lookup('$UUID').stateObj; if (e._rows.length) e._reveal(e._rows[0]); 'ok'" >/dev/null
+  eval_shell "const e = Main.extensionManager.lookup('$UUID').stateObj._popup; if (e._rows.length) e._reveal(e._rows[0]); 'ok'" >/dev/null
 }
 
 open_menu

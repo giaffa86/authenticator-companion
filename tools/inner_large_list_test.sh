@@ -70,7 +70,7 @@ for i in $(seq 0 $((COUNT - 1))); do
     printf 'acct:%03d\n' "$i"
 done > "$FAKE/ids"
 
-ev "globalThis.__otpExt = Main.extensionManager.lookup('$UUID').stateObj; 'ok'" >/dev/null
+ev "globalThis.__otpExt = Main.extensionManager.lookup('$UUID').stateObj._popup; 'ok'" >/dev/null
 
 ev "globalThis.__otpExt._button.menu.open(); 'ok'" >/dev/null
 if wait_rows "$COUNT"; then

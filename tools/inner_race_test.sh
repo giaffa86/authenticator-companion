@@ -69,6 +69,7 @@ snap() {
             menuOpen: !!(ext._button && ext._button.menu && ext._button.menu.isOpen),
             buttonNull: ext._button === null,
             serviceNull: ext._service === null,
+            cachedIds: ext._lastIds.length,
             generation: ext._generation
         };
     })()"
@@ -109,7 +110,7 @@ wait_rows() {
 # Record clipboard writes instead of performing them.
 ev "(() => {
     const St = imports.gi.St;
-    globalThis.__otpExt = Main.extensionManager.lookup('$UUID').stateObj;
+    globalThis.__otpExt = Main.extensionManager.lookup('$UUID').stateObj._popup;
     globalThis.__otpWrites = [];
     St.Clipboard.prototype.set_text = function (type, text) {
         globalThis.__otpWrites.push(String(text));
@@ -214,14 +215,15 @@ sleep 0.2
 delay_first 2500
 copy_first
 sleep 0.2
-ev "globalThis.__otpExt.disable(); 'ok'" >/dev/null
+ev "Main.extensionManager.lookup('$UUID').stateObj.disable(); 'ok'" >/dev/null
 sleep 3.0
 s=$(snap)
 check "G disable nulls button" "True" "$(echo "$s" | field buttonNull)"
+check "G disable drops cached account ids" "0" "$(echo "$s" | field cachedIds)"
 check "G disable nulls service" "True" "$(echo "$s" | field serviceNull)"
 check "G late copy after disable writes nothing" "" "$(echo "$s" | field writes)"
 
-ev "globalThis.__otpExt.enable(); 'ok'" >/dev/null
+ev "Main.extensionManager.lookup('$UUID').stateObj.enable(); globalThis.__otpExt = Main.extensionManager.lookup('$UUID').stateObj._popup; 'ok'" >/dev/null
 sleep 0.5
 open_menu
 if wait_rows 1; then
@@ -235,6 +237,49 @@ else
     RESULTS+=("FAIL G re-enable lists rows")
     FAIL=$((FAIL + 1))
 fi
+
+# --- H. an old refresh must not release a newer request's ownership ---------
+close_menu
+ev "(() => {
+    const ext = globalThis.__otpExt;
+    const syncAccounts = ext._syncAccounts;
+    globalThis.__otpRefreshResults = [];
+    (async () => {
+        try {
+            for (const method of ['_refresh', '_tick']) {
+                const pending = [];
+                let calls = 0;
+                ext._syncAccounts = () => {
+                    calls++;
+                    return new Promise(resolve => pending.push(resolve));
+                };
+                ext._refreshRequest = null;
+                ext._lastErrorText = null;
+                const older = ext[method]();
+                ext._generation++;
+                ext._refreshRequest = null;
+                const newer = ext[method]();
+                const owner = ext._refreshRequest;
+                pending[0](false);
+                await older;
+                const stillOwned = ext._refreshRequest === owner;
+                await ext[method]();
+                const blocked = calls === 2;
+                pending[1](false);
+                await newer;
+                globalThis.__otpRefreshResults.push(stillOwned && blocked && ext._refreshRequest === null);
+            }
+        } finally {
+            ext._syncAccounts = syncAccounts;
+        }
+    })();
+    return 'started';
+})()" >/dev/null
+sleep 0.5
+refresh_results=$(jseval "globalThis.__otpRefreshResults")
+check "H stale refresh cannot unlock a newer refresh or tick" "[true,true]" "$refresh_results"
+open_menu
+wait_rows 1 >/dev/null
 
 # --- I. malformed metadata: visible error, logged once, recovery (U01) ----
 LOG="${OTP_RUNTIME:-/tmp}/shell.log"
