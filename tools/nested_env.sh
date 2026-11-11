@@ -15,7 +15,8 @@ CFG=$(mktemp -d /tmp/otp-cfg-XXXXXX)
 mkdir -p "$DATA/gnome-shell/extensions/$EXT_UUID" "$DATA/gnome-shell/extensions/authenticator-companion-test-unsafe@giaffa86" "$DATA/glib-2.0/schemas"
 cp "$SRC/metadata.json" "$SRC/extension.js" "$SRC/prefs.js" "$SRC/stylesheet.css" \
    "$DATA/gnome-shell/extensions/$EXT_UUID/"
-cp -r "$SRC/shell" "$DATA/gnome-shell/extensions/$EXT_UUID/"
+"$SRC/scripts/i18n.sh" compile
+cp -r "$SRC/shell" "$SRC/locale" "$DATA/gnome-shell/extensions/$EXT_UUID/"
 cp "$SRC/schemas/"*.gschema.xml "$DATA/glib-2.0/schemas/"
 glib-compile-schemas "$DATA/glib-2.0/schemas/"
 cp "$SRC/tools/unsafe_helper/metadata.json" "$SRC/tools/unsafe_helper/extension.js" \

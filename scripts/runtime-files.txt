@@ -1,0 +1,13 @@
+metadata.json
+extension.js
+prefs.js
+stylesheet.css
+shell/accountMenuItem.js
+shell/popup.js
+shell/provider.js
+schemas/org.gnome.shell.extensions.authenticator-companion.gschema.xml
+LICENSE
+locale/it/LC_MESSAGES/authenticator-companion.mo
+locale/es/LC_MESSAGES/authenticator-companion.mo
+locale/de/LC_MESSAGES/authenticator-companion.mo
+locale/fr/LC_MESSAGES/authenticator-companion.mo

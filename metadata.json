@@ -6,5 +6,6 @@
     "50"
   ],
   "settings-schema": "org.gnome.shell.extensions.authenticator-companion",
-  "url": "https://github.com/giaffa86/authenticator-companion"
+  "url": "https://github.com/giaffa86/authenticator-companion",
+  "gettext-domain": "authenticator-companion"
 }

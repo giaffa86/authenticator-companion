@@ -1,0 +1,237 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+msgid ""
+msgstr ""
+"Project-Id-Version: Authenticator Companion\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-11 00:00+0100\n"
+"PO-Revision-Date: 2026-11-11 00:00+0100\n"
+"Last-Translator: giaffa86 contributors\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language-Team: \n"
+"Language: \n"
+
+#: prefs.js:29
+msgid "Reset to default"
+msgstr ""
+
+#: prefs.js:115
+msgid "General"
+msgstr ""
+
+#: prefs.js:121
+msgid "Behaviour"
+msgstr ""
+
+#: prefs.js:122
+msgid "How the popup reacts to user actions"
+msgstr ""
+
+#: prefs.js:129
+msgid "Focus the search field on open"
+msgstr ""
+
+#: prefs.js:135
+msgid "Close the popup after copying a code"
+msgstr ""
+
+#: prefs.js:139
+msgid "Appearance"
+msgstr ""
+
+#: prefs.js:145
+msgid "Panel Indicator"
+msgstr ""
+
+#: prefs.js:146
+msgid "Icon shown in the top panel"
+msgstr ""
+
+#: prefs.js:153 prefs.js:228
+msgid "Icon"
+msgstr ""
+
+#: prefs.js:155
+msgid "Lock"
+msgstr ""
+
+#: prefs.js:155
+msgid "Password"
+msgstr ""
+
+#: prefs.js:155
+msgid "Secure channel"
+msgstr ""
+
+#: prefs.js:155
+msgid "Smartcard"
+msgstr ""
+
+#: prefs.js:159
+msgid "Account List"
+msgstr ""
+
+#: prefs.js:160
+msgid "Configure the account rows"
+msgstr ""
+
+#: prefs.js:167
+msgid "Sort accounts by"
+msgstr ""
+
+#: prefs.js:169
+msgid "Account name"
+msgstr ""
+
+#: prefs.js:169
+msgid "As returned by Authenticator"
+msgstr ""
+
+#: prefs.js:169
+msgid "Provider name"
+msgstr ""
+
+#: prefs.js:175
+msgid "Show provider name"
+msgstr ""
+
+#: prefs.js:181
+msgid "Row density"
+msgstr ""
+
+#: prefs.js:183
+msgid "Comfortable"
+msgstr ""
+
+#: prefs.js:183
+msgid "Compact"
+msgstr ""
+
+#: prefs.js:189
+msgid "Search in"
+msgstr ""
+
+#: prefs.js:191
+msgid "Name and provider"
+msgstr ""
+
+#: prefs.js:191
+msgid "Name only"
+msgstr ""
+
+#: prefs.js:191
+msgid "Provider only"
+msgstr ""
+
+#: prefs.js:197
+msgid "Group digits of the revealed code"
+msgstr ""
+
+#: prefs.js:203
+msgid "Show the validity countdown bar"
+msgstr ""
+
+#: prefs.js:207
+msgid "Visible rows"
+msgstr ""
+
+#: prefs.js:208
+msgid "How many accounts the list shows without scrolling"
+msgstr ""
+
+#: prefs.js:214 prefs.js:252 shell/popup.js:71 shell/popup.js:114
+msgid "Open Authenticator"
+msgstr ""
+
+#: prefs.js:215
+msgid "Configure the shortcut that brings the app to the front"
+msgstr ""
+
+#: prefs.js:222
+msgid "Show the open-app button"
+msgstr ""
+
+#: prefs.js:230
+msgid "Arrow"
+msgstr ""
+
+#: prefs.js:230
+msgid "Executable"
+msgstr ""
+
+#: prefs.js:230
+msgid "External link"
+msgstr ""
+
+#: prefs.js:230
+msgid "New window"
+msgstr ""
+
+#: prefs.js:234
+msgid "Shortcuts"
+msgstr ""
+
+#: prefs.js:240
+msgid "Popup"
+msgstr ""
+
+#: prefs.js:241
+msgid "Keyboard shortcut for the Authenticator Companion popup"
+msgstr ""
+
+#: prefs.js:248
+msgid "Open or close the popup"
+msgstr ""
+
+#: prefs.js:253
+msgid "Keyboard shortcut that brings the app window to the front"
+msgstr ""
+
+#: prefs.js:260
+msgid "Bring Authenticator to the front"
+msgstr ""
+
+#: shell/accountMenuItem.js:96 shell/accountMenuItem.js:156
+msgid "Show code"
+msgstr ""
+
+#: shell/accountMenuItem.js:156
+msgid "Hide code"
+msgstr ""
+
+#: shell/accountMenuItem.js:208
+msgid "Copied to clipboard"
+msgstr ""
+
+#: shell/popup.js:37
+msgid "Authenticator Companion"
+msgstr ""
+
+#: shell/popup.js:57
+msgid "Search accounts…"
+msgstr ""
+
+#: shell/popup.js:260
+msgid "Loading…"
+msgstr ""
+
+#: shell/popup.js:411
+msgid "No codes available. Authenticator is locked or has no accounts."
+msgstr ""
+
+#: shell/popup.js:433
+msgid "Unexpected response from Authenticator."
+msgstr ""
+
+#: shell/popup.js:523 shell/popup.js:547
+msgid "No code available for this account."
+msgstr ""
+
+#: shell/popup.js:602
+msgid "Authenticator is not available. Make sure it is running."
+msgstr ""
+
+#: shell/popup.js:603
+msgid "Authenticator is not installed."
+msgstr ""

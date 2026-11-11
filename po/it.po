@@ -1,0 +1,241 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+msgid ""
+msgstr ""
+"Project-Id-Version: Authenticator Companion\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-11 00:00+0100\n"
+"PO-Revision-Date: 2026-11-11 00:00+0100\n"
+"Last-Translator: giaffa86 contributors\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language-Team: Italian\n"
+"Language: it\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: prefs.js:29
+msgid "Reset to default"
+msgstr "Ripristina il valore predefinito"
+
+#: prefs.js:115
+msgid "General"
+msgstr "Generale"
+
+#: prefs.js:121
+msgid "Behaviour"
+msgstr "Comportamento"
+
+#: prefs.js:122
+msgid "How the popup reacts to user actions"
+msgstr "Come il menu a comparsa reagisce alle azioni dell’utente"
+
+#: prefs.js:129
+msgid "Focus the search field on open"
+msgstr "Attiva il campo di ricerca all’apertura"
+
+#: prefs.js:135
+msgid "Close the popup after copying a code"
+msgstr "Chiudi il menu a comparsa dopo aver copiato un codice"
+
+#: prefs.js:139
+msgid "Appearance"
+msgstr "Aspetto"
+
+#: prefs.js:145
+msgid "Panel Indicator"
+msgstr "Indicatore nel pannello"
+
+#: prefs.js:146
+msgid "Icon shown in the top panel"
+msgstr "Icona mostrata nel pannello superiore"
+
+#: prefs.js:153 prefs.js:228
+msgid "Icon"
+msgstr "Icona"
+
+#: prefs.js:155
+msgid "Lock"
+msgstr "Lucchetto"
+
+#: prefs.js:155
+msgid "Password"
+msgstr "Password"
+
+#: prefs.js:155
+msgid "Secure channel"
+msgstr "Canale sicuro"
+
+#: prefs.js:155
+msgid "Smartcard"
+msgstr "Smart card"
+
+#: prefs.js:159
+msgid "Account List"
+msgstr "Elenco degli account"
+
+#: prefs.js:160
+msgid "Configure the account rows"
+msgstr "Configura le righe degli account"
+
+#: prefs.js:167
+msgid "Sort accounts by"
+msgstr "Ordina gli account per"
+
+#: prefs.js:169
+msgid "Account name"
+msgstr "Nome dell’account"
+
+#: prefs.js:169
+msgid "As returned by Authenticator"
+msgstr "Come restituiti da Authenticator"
+
+#: prefs.js:169
+msgid "Provider name"
+msgstr "Nome del servizio"
+
+#: prefs.js:175
+msgid "Show provider name"
+msgstr "Mostra il nome del servizio"
+
+#: prefs.js:181
+msgid "Row density"
+msgstr "Densità delle righe"
+
+#: prefs.js:183
+msgid "Comfortable"
+msgstr "Ampia"
+
+#: prefs.js:183
+msgid "Compact"
+msgstr "Compatta"
+
+#: prefs.js:189
+msgid "Search in"
+msgstr "Cerca in"
+
+#: prefs.js:191
+msgid "Name and provider"
+msgstr "Nome e servizio"
+
+#: prefs.js:191
+msgid "Name only"
+msgstr "Solo nome"
+
+#: prefs.js:191
+msgid "Provider only"
+msgstr "Solo servizio"
+
+#: prefs.js:197
+msgid "Group digits of the revealed code"
+msgstr "Raggruppa le cifre del codice mostrato"
+
+#: prefs.js:203
+msgid "Show the validity countdown bar"
+msgstr "Mostra la barra del tempo di validità rimanente"
+
+#: prefs.js:207
+msgid "Visible rows"
+msgstr "Righe visibili"
+
+#: prefs.js:208
+msgid "How many accounts the list shows without scrolling"
+msgstr "Quanti account mostra l’elenco senza scorrere"
+
+#: prefs.js:214 prefs.js:252 shell/popup.js:71 shell/popup.js:114
+msgid "Open Authenticator"
+msgstr "Apri Authenticator"
+
+#: prefs.js:215
+msgid "Configure the shortcut that brings the app to the front"
+msgstr "Configura il comando che porta l’applicazione in primo piano"
+
+#: prefs.js:222
+msgid "Show the open-app button"
+msgstr "Mostra il pulsante per aprire l’applicazione"
+
+#: prefs.js:230
+msgid "Arrow"
+msgstr "Freccia"
+
+#: prefs.js:230
+msgid "Executable"
+msgstr "Eseguibile"
+
+#: prefs.js:230
+msgid "External link"
+msgstr "Collegamento esterno"
+
+#: prefs.js:230
+msgid "New window"
+msgstr "Nuova finestra"
+
+#: prefs.js:234
+msgid "Shortcuts"
+msgstr "Scorciatoie"
+
+#: prefs.js:240
+msgid "Popup"
+msgstr "Menu a comparsa"
+
+#: prefs.js:241
+msgid "Keyboard shortcut for the Authenticator Companion popup"
+msgstr "Scorciatoia da tastiera per il menu di Authenticator Companion"
+
+#: prefs.js:248
+msgid "Open or close the popup"
+msgstr "Apri o chiudi il menu a comparsa"
+
+#: prefs.js:253
+msgid "Keyboard shortcut that brings the app window to the front"
+msgstr ""
+"Scorciatoia da tastiera che porta la finestra dell’applicazione in primo "
+"piano"
+
+#: prefs.js:260
+msgid "Bring Authenticator to the front"
+msgstr "Porta Authenticator in primo piano"
+
+#: shell/accountMenuItem.js:96 shell/accountMenuItem.js:156
+msgid "Show code"
+msgstr "Mostra il codice"
+
+#: shell/accountMenuItem.js:156
+msgid "Hide code"
+msgstr "Nascondi il codice"
+
+#: shell/accountMenuItem.js:208
+msgid "Copied to clipboard"
+msgstr "Copiato negli appunti"
+
+#: shell/popup.js:37
+msgid "Authenticator Companion"
+msgstr "Authenticator Companion"
+
+#: shell/popup.js:57
+msgid "Search accounts…"
+msgstr "Cerca account…"
+
+#: shell/popup.js:260
+msgid "Loading…"
+msgstr "Caricamento…"
+
+#: shell/popup.js:411
+msgid "No codes available. Authenticator is locked or has no accounts."
+msgstr ""
+"Nessun codice disponibile. Authenticator è bloccato o non contiene account."
+
+#: shell/popup.js:433
+msgid "Unexpected response from Authenticator."
+msgstr "Risposta inattesa da Authenticator."
+
+#: shell/popup.js:523 shell/popup.js:547
+msgid "No code available for this account."
+msgstr "Nessun codice disponibile per questo account."
+
+#: shell/popup.js:602
+msgid "Authenticator is not available. Make sure it is running."
+msgstr "Authenticator non è disponibile. Assicurati che sia in esecuzione."
+
+#: shell/popup.js:603
+msgid "Authenticator is not installed."
+msgstr "Authenticator non è installato."

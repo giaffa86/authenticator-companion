@@ -34,3 +34,7 @@ __pycache__/
 # Local runtime artifacts
 core
 core.*
+
+# Build outputs
+/dist/
+/locale/**/*.mo
