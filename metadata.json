@@ -3,7 +3,8 @@
   "name": "Authenticator Companion",
   "description": "Companion extension for GNOME Authenticator: it only works while Authenticator is installed and unlocked. It shows the accounts already configured in the app in the top panel and copies the current OTP code to the system clipboard with one click. It touches the clipboard only for that explicit action, and re-checks availability before every reveal and copy. Authenticator stays the only source of accounts: the extension reads them through its D-Bus Search Provider and never imports, stores or reads secrets itself.",
   "shell-version": [
-    "50"
+    "50",
+    "51"
   ],
   "settings-schema": "org.gnome.shell.extensions.authenticator-companion",
   "url": "https://github.com/giaffa86/authenticator-companion",
